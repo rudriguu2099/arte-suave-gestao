@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: arte-suave-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-arte_suave_gestao}
+    ports:
+      - '${DATABASE_PORT:-5432}:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${DATABASE_USER:-postgres} -d ${DATABASE_NAME:-arte_suave_gestao}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./backend
+      target: development
+    container_name: arte-suave-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # Overrides .env: inside the compose network the database is reachable
+      # through the "db" service name, not localhost.
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+    ports:
+      - '${PORT:-3000}:3000'
+    volumes:
+      - ./backend:/app:z
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  backend_node_modules:
