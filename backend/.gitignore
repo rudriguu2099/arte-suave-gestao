@@ -1,0 +1,26 @@
+# compiled output
+/dist
+/node_modules
+tsconfig.build.tsbuildinfo
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# environment
+.env
+.env.*.local
+
+# IDE
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.DS_Store
+
+# tests
+/coverage
+/.nyc_output
