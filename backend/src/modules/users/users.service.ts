@@ -94,6 +94,11 @@ export class UsersService {
     if (!user) throw new NotFoundException('Usuário não encontrado');
     return user;
   }
+
+  async remove(id: string): Promise<void> {
+    await this.findUserOrFail(id);
+    await this.usersRepository.softDelete(id);
+  }
   
   private assertAdultForAthleteRole(role: Role, birthDate: Date): void {
     if (role !== Role.ATLETA_MAIOR) return;
