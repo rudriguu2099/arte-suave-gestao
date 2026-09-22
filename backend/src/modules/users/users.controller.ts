@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards, Delete, HttpCode, } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -10,6 +10,7 @@ import {
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
+  ApiNoContentResponse,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -94,5 +95,15 @@ export class UsersController {
   @Patch(':id/reset-password')
   resetPassword(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ResetPasswordDto) {
     return this.usersService.resetPassword(id, dto.newPassword);
+  }
+
+  @ApiOperation({ summary: 'Remove a conta (soft delete)' })
+  @ApiNoContentResponse({ description: 'Usuário removido' })
+  @ApiBadRequestResponse({ description: 'id não é um UUID' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
+  @Delete(':id')
+  @HttpCode(204)
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.remove(id);
   }
 }

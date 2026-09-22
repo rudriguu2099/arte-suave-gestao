@@ -5,6 +5,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 import { Role } from '../../../common/enums/role.enum.js';
 
@@ -21,7 +22,6 @@ export class User {
   @ApiProperty({ example: 'rodrigo@example.com' })
   @Column({ unique: true })
   email: string;
-
   
   @ApiHideProperty()
   @Column()
@@ -46,4 +46,8 @@ export class User {
   @ApiProperty()
   @UpdateDateColumn()
   updatedAt: Date;
+  
+  @ApiProperty()
+  @DeleteDateColumn()
+  deletedAt: Date | null;
 }
