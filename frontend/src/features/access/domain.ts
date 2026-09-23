@@ -37,19 +37,11 @@ export function formatBirthDate(value: string): string {
 }
 
 export function initialPassword(name: string, birthDate: string): string {
-  const normalized = name
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-  const firstName = normalized.split(/\s+/)[0];
-  if (Array.from(firstName).length < 3)
-    throw new Error(
-      "O primeiro nome precisa de três caracteres para aplicar a RN015.",
-    );
+  const prefix = name.trim().slice(0, 3).toLowerCase();
   if (ageOn(birthDate) < 0)
     throw new Error("Informe uma data de nascimento válida.");
   return (
-    Array.from(firstName).slice(0, 3).join("") + birthDate.replace(/\D/g, "")
+    prefix + birthDate.replace(/\D/g, "")
   );
 }
 

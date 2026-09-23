@@ -25,18 +25,15 @@ const account = {
   isSuperAdmin: false,
   athleteIds: [],
 };
-test("RN015 removes accents, preserves case, appends DDMMYYYY and uses account holder", () => {
-  assert.equal(initialPassword("Álvaro Silva", "05/09/2004"), "Alv05092004");
-  assert.equal(initialPassword("  ÉRIca Souza ", "02/01/1980"), "ERI02011980");
-  assert.equal(initialPassword("Paulo José", "12/06/1980"), "Pau12061980");
+test("RN015 matches backend: lowercase, keeps accents, appends DDMMYYYY and uses account holder", () => {
+  assert.equal(initialPassword("Álvaro Silva", "05/09/2004"), "álv05092004");
+  assert.equal(initialPassword("  ÉRIca Souza ", "02/01/1980"), "éri02011980");
+  assert.equal(initialPassword("Paulo José", "12/06/1980"), "pau12061980");
   assert.equal(
     initialPassword("Ana Coordenadora", "10/02/1985"),
-    "Ana10021985",
+    "ana10021985",
   );
-  assert.throws(
-    () => initialPassword("Li Souza", "05/09/2004"),
-    /três caracteres/,
-  );
+  assert.equal(initialPassword("Li Souza", "05/09/2004"), "li 05092004");
 });
 test("real dates, leap years and exact adulthood boundary", () => {
   assert.equal(parseBirthDate("31/02/2004"), null);

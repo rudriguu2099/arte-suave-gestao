@@ -76,6 +76,7 @@ export function AdminFooter({
 
 export function EventCards() {
   const { events } = useAccess();
+  if (!events.length) return <Text style={styles.muted}>Nenhum evento disponível.</Text>;
   return (
     <View style={{ gap: 8 }}>
       {events.map((event) => (

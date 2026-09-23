@@ -141,7 +141,7 @@ export function AttendanceScreen({
     <Page footer={<AdminFooter navigation={navigation} active="Attendance" />}>
       <Heading
         title="FREQUÊNCIA"
-        subtitle="Consulta dos treinos · Setembro/2026"
+        subtitle="Consulta dos treinos registrados"
       />
       <Select
         label="Turma"

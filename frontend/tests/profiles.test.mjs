@@ -45,7 +45,7 @@ test("adult profile atomically creates login and student, with RN015 password", 
   assert.equal(athlete.accountId, account.id);
   assert.deepEqual(account.athleteIds, [athlete.id]);
   assert.equal(account.isSuperAdmin, false);
-  assert.equal(result.password, "Alv05092004");
+  assert.equal(result.password, "álv05092004");
   assert.equal(result.hasAccess, true);
   assert.equal(before.accounts.length, seedAccounts.length);
 });
@@ -110,7 +110,7 @@ test("responsible profile creates only an account, without needing students or g
   assert.equal(state.accounts.length, before.accounts.length + 1);
   assert.equal(state.athletes.length, before.athletes.length);
   assert.deepEqual(state.accounts.at(-1).athleteIds, []);
-  assert.equal(result.password, "Alv05092004");
+  assert.equal(result.password, "álv05092004");
 });
 test("administrator profile never gets the superadmin flag, even with a forged payload", () => {
   const { state } = save(

@@ -60,6 +60,7 @@ export type Event = {
 };
 
 export type RootStackParamList = {
+  Login: undefined;
   Home: undefined;
   Accounts: undefined;
   AccountForm: ProfileTarget | undefined;

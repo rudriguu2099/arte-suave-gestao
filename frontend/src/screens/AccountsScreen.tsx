@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AdminFooter } from "../components/access";
 import {
   Button,
+  Dialog,
   ErrorMessage,
   Field,
   Heading,
@@ -22,6 +23,10 @@ export default function AccountsScreen({
   const { accounts, athletes, current, toggleActive } = useAccess();
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const [pending, setPending] = useState<
+    ReturnType<typeof profileRows>[number] | null
+  >(null);
+  const [busy, setBusy] = useState(false);
   if (!isSuperAdmin(current)) return null;
   const rows = profileRows({ accounts, athletes });
   const filtered = rows.filter((row) =>
@@ -36,36 +41,34 @@ export default function AccountsScreen({
       .toLocaleLowerCase()
       .includes(query.trim().toLocaleLowerCase()),
   );
-  function changeStatus(row: (typeof rows)[number]) {
-    Alert.alert(
-      (row.active ? "Inativar" : "Ativar") +
-        (row.hasAccess ? " conta?" : " aluno?"),
-      row.hasAccess
-        ? row.name +
-            (row.active
-              ? " ficará sem acesso ao sistema."
-              : " poderá acessar o sistema novamente.")
-        : "Alterar a situação do aluno " +
-            row.name +
-            ". A conta do responsável não será alterada.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: row.active ? "Inativar" : "Ativar",
-          onPress: () => {
-            try {
-              toggleActive(row.target);
-              setError("");
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          },
-        },
-      ],
-    );
+  async function confirmStatus() {
+    if (!pending || busy) return;
+    setBusy(true);
+    try {
+      await toggleActive(pending.target);
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPending(null);
+      setBusy(false);
+    }
   }
   return (
     <Page footer={<AdminFooter navigation={navigation} active="Accounts" />}>
+      <Dialog
+        visible={!!pending}
+        title={pending?.active ? "Inativar perfil?" : "Ativar perfil?"}
+        message={
+          pending
+            ? `${pending.name}: ${pending.hasAccess ? "o acesso ao sistema será alterado." : "a situação do aluno será alterada. A conta do responsável será mantida."}`
+            : ""
+        }
+        onClose={() => setPending(null)}
+        onConfirm={confirmStatus}
+        busy={busy}
+        confirmLabel={pending?.active ? "INATIVAR" : "ATIVAR"}
+      />
       <Heading
         title="GERENCIAMENTO DE CONTAS"
         subtitle="Todos os perfis e alunos em um único cadastro."
@@ -134,7 +137,7 @@ export default function AccountsScreen({
                     title={row.active ? "INATIVAR" : "ATIVAR"}
                     compact
                     secondary
-                    onPress={() => changeStatus(row)}
+                    onPress={() => setPending(row)}
                   />
                 )}
                 {row.hasAccess && row.accountId && (

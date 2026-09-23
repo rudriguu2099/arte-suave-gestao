@@ -22,6 +22,70 @@ export const colors = {
   background: "#F3F3F3",
   error: "#A32626",
 };
+
+export function Dialog({
+  visible,
+  title,
+  message,
+  onClose,
+  confirmLabel = "CONCLUIR",
+  onConfirm,
+  busy = false,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+  confirmLabel?: string;
+  onConfirm?: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        if (!busy) onClose();
+      }}
+    >
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 24,
+          backgroundColor: "#00000066",
+        }}
+      >
+        <View
+          accessibilityViewIsModal
+          style={[styles.card, { width: "100%", maxWidth: 460 }]}
+        >
+          <Text accessibilityRole="header" style={styles.heading}>
+            {title}
+          </Text>
+          <Text selectable style={styles.text}>
+            {message}
+          </Text>
+          {onConfirm && (
+            <Button
+              title="CANCELAR"
+              secondary
+              disabled={busy}
+              onPress={onClose}
+            />
+          )}
+          <Button
+            title={busy ? "AGUARDE..." : confirmLabel}
+            disabled={busy}
+            onPress={onConfirm ?? onClose}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
 export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
   content: {

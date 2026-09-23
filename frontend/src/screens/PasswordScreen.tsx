@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   Back,
   Button,
   Check,
   ErrorMessage,
+  Dialog,
   Field,
   Heading,
   Page,
@@ -22,6 +23,9 @@ export default function PasswordScreen({
 }: NativeStackScreenProps<RootStackParamList, "Password">) {
   const { current, accounts, changePassword } = useAccess();
   const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
@@ -35,23 +39,29 @@ export default function PasswordScreen({
         <ErrorMessage message="Conta indisponível para alteração de senha." />
       </Page>
     );
-  function save() {
+  async function save() {
+    if (saving) return;
+    setSaving(true);
     try {
-      changePassword(target!.id, password, confirmation);
+      await changePassword(target!.id, password, confirmation, currentPassword);
       setPassword("");
       setConfirmation("");
       setError("");
-      Alert.alert(
-        "Validação concluída",
-        "Demonstração: os campos foram validados. A alteração real da senha depende da integração com a API.",
-        [{ text: "Concluir", onPress: () => navigation.goBack() }],
-      );
+      if (other) setSuccess(true);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setSaving(false);
     }
   }
   return (
     <Page>
+      <Dialog
+        visible={success}
+        title="Senha redefinida"
+        message="A nova senha foi salva. O usuário deverá entrar novamente."
+        onClose={() => navigation.goBack()}
+      />
       <Back onPress={navigation.goBack} />
       <Heading
         title={other ? "REDEFINIR SENHA" : "ALTERAR MINHA SENHA"}
@@ -67,6 +77,17 @@ export default function PasswordScreen({
             <Text style={styles.heading}>Criar nova senha</Text>
             <View style={styles.titleRule} />
           </View>
+          {!other && (
+            <Field
+              label="Senha atual *"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry={!visible}
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
+            />
+          )}
           <Field
             label="Nova senha *"
             value={password}
@@ -97,8 +118,17 @@ export default function PasswordScreen({
               },
             ]}
           >
-            <Button title="CANCELAR" secondary onPress={navigation.goBack} />
-            <Button title={other ? "REDEFINIR" : "ALTERAR"} onPress={save} />
+            <Button
+              title="CANCELAR"
+              secondary
+              disabled={saving}
+              onPress={navigation.goBack}
+            />
+            <Button
+              title={saving ? "SALVANDO..." : other ? "REDEFINIR" : "ALTERAR"}
+              disabled={saving}
+              onPress={save}
+            />
           </View>
         </Section>
       </View>

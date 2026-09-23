@@ -10,9 +10,11 @@
     "expo-font": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "^5.4.0",
-    "react-native-screens": "^4.11.0"
+    "react-native-screens": "^4.11.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

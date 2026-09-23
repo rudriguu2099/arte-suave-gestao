@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   Back,
@@ -7,6 +7,7 @@ import {
   Check,
   Contacts,
   ErrorMessage,
+  Dialog,
   Field,
   Heading,
   Page,
@@ -58,6 +59,8 @@ export default function AccountFormScreen({
   const [guardianId, setGuardianId] = useState(student?.guardianId ?? "");
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState("");
   const submitted = useRef(false);
   const age = ageOn(birthDate);
   const minor = role === "athlete" && age >= 0 && age < 18;
@@ -81,12 +84,15 @@ export default function AccountFormScreen({
         <ErrorMessage message="Perfil não encontrado." />
       </Page>
     );
-  function save() {
+  async function save() {
     if (submitted.current) return;
     if (!role) {
       setError("Selecione a função.");
       return;
     }
+    submitted.current = true;
+    setSaving(true);
+    setError("");
     try {
       const input: ProfileInput = {
         name,
@@ -97,8 +103,7 @@ export default function AccountFormScreen({
         groupId: role === "athlete" ? groupId : undefined,
         guardianId: minor ? guardianId : undefined,
       };
-      const result = saveProfile(input, target);
-      submitted.current = true;
+      const result = await saveProfile(input, target);
       const message = !result.hasAccess
         ? "Aluno vinculado ao responsável selecionado. Não foi criada conta ou senha para o menor. A senha do responsável permanece a mesma."
         : result.password
@@ -109,17 +114,22 @@ export default function AccountFormScreen({
               ? "\nO cadastro de aluno também foi criado automaticamente."
               : "")
           : "Perfil atualizado. A senha existente permanece a mesma.";
-      Alert.alert(
-        target ? "Perfil atualizado" : "Perfil cadastrado",
-        message + "\n\nDemonstração: dados mantidos apenas nesta sessão.",
-        [{ text: "Concluir", onPress: () => navigation.goBack() }],
-      );
+      setSuccess(message);
     } catch (e) {
       setError((e as Error).message);
+      submitted.current = false;
+    } finally {
+      setSaving(false);
     }
   }
   return (
     <Page>
+      <Dialog
+        visible={!!success}
+        title={target ? "Perfil atualizado" : "Perfil cadastrado"}
+        message={success}
+        onClose={() => navigation.goBack()}
+      />
       <Back onPress={navigation.goBack} />
       <Heading
         title={target ? "EDITAR PERFIL" : "NOVO PERFIL"}
@@ -251,8 +261,8 @@ export default function AccountFormScreen({
             onChange={setVisible}
           />
           <Text style={styles.muted}>
-            Três primeiros caracteres do nome do titular sem acentos,
-            preservando maiúsculas, seguidos do nascimento em DDMMAAAA.
+            Três primeiros caracteres do nome do titular em minúsculas, mantendo
+            os acentos, seguidos do nascimento em DDMMAAAA.
           </Text>
         </Section>
       )}
@@ -263,11 +273,22 @@ export default function AccountFormScreen({
           { justifyContent: "space-between", flexWrap: "wrap" },
         ]}
       >
-        <Button title="CANCELAR" secondary onPress={navigation.goBack} />
         <Button
-          title={target ? "SALVAR ALTERAÇÕES" : "CADASTRAR PERFIL"}
+          title="CANCELAR"
+          secondary
+          disabled={saving}
+          onPress={navigation.goBack}
+        />
+        <Button
+          title={
+            saving
+              ? "SALVANDO..."
+              : target
+                ? "SALVAR ALTERAÇÕES"
+                : "CADASTRAR PERFIL"
+          }
           onPress={save}
-          disabled={minor && !guardians.length}
+          disabled={saving || !!success || (minor && !guardians.length)}
         />
       </View>
     </Page>
