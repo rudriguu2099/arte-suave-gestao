@@ -6,6 +6,7 @@ import { AppService } from './app.service.js';
 import configuration from './config/configuration.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { AccessModule } from './modules/access/access.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
     }),
     UsersModule,
     AuthModule,
+    AccessModule,
   ],
   controllers: [AppController],
   providers: [AppService],

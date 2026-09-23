@@ -69,6 +69,8 @@ describe('AuthService', () => {
         id: activeUser.id,
         email: activeUser.email,
         role: activeUser.role,
+        isSuperAdmin: false,
+        tokenVersion: 0,
       });
     });
 

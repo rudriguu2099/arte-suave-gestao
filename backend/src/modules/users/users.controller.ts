@@ -21,12 +21,13 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
+import { SuperAdminGuard } from '../../common/guards/superadmin.guard.js';
 
 @ApiTags('admin/users')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Token ausente, inválido ou expirado' })
-@ApiForbiddenResponse({ description: 'Perfil sem permissão (exige ADMINISTRADOR)' })
-@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiForbiddenResponse({ description: 'Acesso exclusivo do superadmin' })
+@UseGuards(JwtAuthGuard, RolesGuard, SuperAdminGuard)
 @Roles(Role.ADMINISTRADOR)
 @Controller('admin/users')
 export class UsersController {
@@ -35,7 +36,7 @@ export class UsersController {
   @ApiOperation({
     summary: 'Cria uma conta',
     description:
-      'Senha inicial gerada automaticamente (RN015): 3 primeiras letras do nome em minúsculas + data de nascimento DDMMAAAA. Ex: "Rodrigo Silva", 2002-05-15 → rod15052002.',
+      'RN015: 3 primeiros caracteres do nome em minúsculas, mantendo acentos, + nascimento DDMMAAAA. Ex: Rodrigo, 2002-05-15 → rod15052002.',
   })
   @ApiCreatedResponse({ type: User })
   @ApiBadRequestResponse({ description: 'Corpo inválido ou ATLETA_MAIOR com menos de 18 anos (RN008)' })

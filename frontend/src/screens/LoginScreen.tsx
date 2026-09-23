@@ -1,11 +1,11 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useState} from 'react'
-import { View, Alert, Text, Image, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native'
-import { api } from '../services/api'
+import { View, Text, Image, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { useAccess } from '../features/access/AccessContext'
 import type { RootStackParamList } from '../routes/types'
 import { useTheme } from '../contexts/ThemeContexts'
 import { styles } from './LoginScreen.styles'
-import { validarObrigatorio, emailValido, senhaValida } from '../utils/validators';
+import { validarObrigatorio, emailValido } from '../utils/validators';
 
 type props = NativeStackScreenProps<RootStackParamList, "Login">
 
@@ -21,7 +21,7 @@ function BarraColorida() {
   );
 }
 
-export default function LoginScreen({ navigation } : props) {
+export default function LoginScreen() {
 
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
@@ -29,10 +29,11 @@ export default function LoginScreen({ navigation } : props) {
     const [erro, setErro] = useState('');
     const [campoInvalido, setCampoInvalido] = useState<'email' | 'senha' | null>(null);
     const { cores } = useTheme();
+    const { login, sessionMessage } = useAccess();
 
     async function handleLogin() {
         const emailLimpo = email.trim();
-        const senhaLimpa = senha.trim();
+        const senhaLimpa = senha;
 
         const erroEmailObrigatorio = validarObrigatorio(emailLimpo, 'E-mail');
         if (erroEmailObrigatorio) {
@@ -55,20 +56,12 @@ export default function LoginScreen({ navigation } : props) {
             return;
         }
 
-        const erroSenha = senhaValida(senhaLimpa);
-        if (erroSenha) {
-            setErro(erroSenha);
-            setCampoInvalido('senha');
-            return;
-        }
-
         setErro('');
         setLoading(true);
         try {
-            await api.post('/auth/login', { email: emailLimpo, senha: senhaLimpa });
-            navigation.replace('Home');
+            await login(emailLimpo, senhaLimpa);
         } catch (e) {
-            Alert.alert('Erro', 'E-mail ou senha inválidos');
+            setErro(e instanceof Error ? e.message : 'Não foi possível entrar.');
         } finally {
             setLoading(false);
         }
@@ -104,6 +97,7 @@ export default function LoginScreen({ navigation } : props) {
             />
 
             {erro ? <Text style={styles.erro}>{ erro }</Text> : null}
+            {sessionMessage ? <Text accessibilityRole="alert" style={{ color: cores.texto, marginBottom: 12 }}>{sessionMessage}</Text> : null}
             <TouchableOpacity 
                 onPress={handleLogin}
                 style ={[styles.botao, {backgroundColor: cores.botaoFundo}, loading && styles.botaoDesativado]}

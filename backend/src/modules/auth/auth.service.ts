@@ -10,6 +10,8 @@ export interface JwtPayload {
   id: string;
   email: string;
   role: Role;
+  isSuperAdmin?: boolean;
+  tokenVersion?: number;
 }
 
 @Injectable()
@@ -20,7 +22,7 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto): Promise<{ accessToken: string }> {
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersService.findByEmail(dto.email.trim().toLowerCase());
     if (!user) throw new UnauthorizedException('Credenciais inválidas');
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
@@ -28,7 +30,7 @@ export class AuthService {
 
     if (!user.isActive) throw new UnauthorizedException('Conta inativa');
 
-    const payload: JwtPayload = { id: user.id, email: user.email, role: user.role };
+    const payload: JwtPayload = { id: user.id, email: user.email, role: user.role, isSuperAdmin: user.isSuperAdmin === true, tokenVersion: user.tokenVersion ?? 0 };
     return { accessToken: this.jwtService.sign(payload) };
   }
   

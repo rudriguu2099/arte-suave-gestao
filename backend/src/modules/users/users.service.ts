@@ -57,9 +57,13 @@ export class UsersService {
     return this.usersRepository.findOneBy({ email });
   }
 
+  findForAuthentication(id: string): Promise<User | null> {
+    return this.usersRepository.findOneBy({ id });
+  }
+
   async update(id: string, dto: UpdateUserDto): Promise<Omit<User, 'password'>> {
     const user = await this.findUserOrFail(id);
-    
+    if (user.isSuperAdmin && dto.role && dto.role !== Role.ADMINISTRADOR) throw new BadRequestException('O perfil de superadmin é gerenciado no banco de dados.');
     const birthDate = new Date(dto.birthDate ?? user.birthDate);
     this.assertAdultForAthleteRole(dto.role ?? user.role, birthDate);
 
@@ -69,13 +73,16 @@ export class UsersService {
 
   async setActive(id: string, isActive: boolean): Promise<Omit<User, 'password'>> {
     const user = await this.findUserOrFail(id);
+    if (user.isSuperAdmin && !isActive) throw new BadRequestException('Não é permitido inativar o superadmin pela aplicação.');
     user.isActive = isActive;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     return this.sanitize(await this.usersRepository.save(user));
   }
 
   async resetPassword(id: string, newPassword: string): Promise<void> {
     const user = await this.findUserOrFail(id);
     user.password = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.usersRepository.save(user);
   }
 
@@ -86,6 +93,7 @@ export class UsersService {
       throw new UnauthorizedException('Senha atual incorreta');
     }
     user.password = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.usersRepository.save(user);
   }
 
@@ -96,7 +104,8 @@ export class UsersService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findUserOrFail(id);
+    const user = await this.findUserOrFail(id);
+    if (user.isSuperAdmin) throw new BadRequestException('Não é permitido remover o superadmin pela aplicação.');
     await this.usersRepository.softDelete(id);
   }
   

@@ -39,6 +39,20 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  @ApiProperty({ example: false, readOnly: true })
+  @Column({ default: false })
+  isSuperAdmin: boolean;
+
+  @ApiHideProperty()
+  @Column({ default: 0 })
+  tokenVersion: number;
+
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  contactEmails: string[];
+
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  phones: string[];
+
   @ApiProperty()
   @CreateDateColumn()
   createdAt: Date;
