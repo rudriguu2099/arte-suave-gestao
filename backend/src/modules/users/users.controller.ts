@@ -42,7 +42,10 @@ export class UsersController {
     return this.usersService.resetPassword(req.user, id, dto.newPassword);
   }
 
-  @ApiOperation({ summary: 'Remove a conta (soft delete)' })
+  @ApiOperation({
+    summary: 'Remove a conta (soft delete)',
+    description: 'Os alunos sob guarda do responsável, ou o registro de aluno do atleta, são inativados junto.',
+  })
   @ApiNoContentResponse({ description: 'Usuário removido' })
   @ApiBadRequestResponse({ description: 'id não é um UUID ou alvo é o superadmin' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado' })

@@ -239,6 +239,20 @@ try {
     root,
     400,
   );
+  // Reativa o menor e remove o responsável: o aluno deve ser inativado em cascata.
+  await call(
+    '/access/profiles/athlete/' + minorId + '/toggle-active',
+    'POST',
+    {},
+    root,
+    201,
+  );
+  await call('/admin/users/' + guardian.row.id, 'DELETE', undefined, root, 204);
+  const orphan = await db.query('SELECT active FROM students WHERE id=$1', [
+    minorId,
+  ]);
+  assert.equal(orphan.rows[0].active, false);
+  await call('/auth/login', 'POST', { email: guardian.profile.emails[0], password: guardian.result.password }, undefined, 401);
   console.log(
     'PASS: ' +
       checks +

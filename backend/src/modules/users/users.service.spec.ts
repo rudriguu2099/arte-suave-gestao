@@ -17,8 +17,10 @@ describe('UsersService', () => {
   let repository: {
     findOneBy: ReturnType<typeof vi.fn>;
     save: ReturnType<typeof vi.fn>;
-    softDelete: ReturnType<typeof vi.fn>;
+    manager: { transaction: ReturnType<typeof vi.fn> };
   };
+  let studentsRepository: { update: ReturnType<typeof vi.fn> };
+  let usersInTransaction: { softDelete: ReturnType<typeof vi.fn> };
   const superAdmin = { id: 's1', email: 's@x.com', role: Role.ADMINISTRADOR, isSuperAdmin: true };
   const admin = { id: 'a1', email: 'a@x.com', role: Role.ADMINISTRADOR, isSuperAdmin: false };
 
@@ -26,8 +28,15 @@ describe('UsersService', () => {
     repository = {
       findOneBy: vi.fn(),
       save: vi.fn(async (data) => data),
-      softDelete: vi.fn(),
+      manager: { transaction: vi.fn() },
     };
+    studentsRepository = { update: vi.fn() };
+    usersInTransaction = { softDelete: vi.fn() };
+    repository.manager.transaction.mockImplementation(async (work) =>
+      work({
+        getRepository: (entity: unknown) => (entity === User ? usersInTransaction : studentsRepository),
+      }),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [UsersService, { provide: getRepositoryToken(User), useValue: repository }],
@@ -109,19 +118,21 @@ describe('UsersService', () => {
   });
 
   describe('remove', () => {
-    it('administrador remove um responsável', async () => {
+    it('administrador remove um responsável e inativa os alunos vinculados', async () => {
       repository.findOneBy.mockResolvedValue({ id: 'u1', role: Role.RESPONSAVEL });
 
       await service.remove(admin, 'u1');
 
-      expect(repository.softDelete).toHaveBeenCalledWith('u1');
+      expect(studentsRepository.update).toHaveBeenCalledWith({ guardianId: 'u1' }, { active: false });
+      expect(studentsRepository.update).toHaveBeenCalledWith({ accountId: 'u1' }, { active: false });
+      expect(usersInTransaction.softDelete).toHaveBeenCalledWith('u1');
     });
 
     it('administrador não remove outro administrador', async () => {
       repository.findOneBy.mockResolvedValue({ id: 'u2', role: Role.ADMINISTRADOR });
 
       await expect(service.remove(admin, 'u2')).rejects.toThrow(ForbiddenException);
-      expect(repository.softDelete).not.toHaveBeenCalled();
+      expect(repository.manager.transaction).not.toHaveBeenCalled();
     });
 
     it('ninguém remove o superadmin', async () => {

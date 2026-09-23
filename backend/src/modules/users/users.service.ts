@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity.js';
+import { Student } from '../access/entities/student.entity.js';
 import type { ChangePasswordDto } from '../auth/dto/change-password.dto.js';
 import type { JwtPayload } from '../auth/auth.service.js';
 import { assertCanManage } from '../../common/utils/can-manage.util.js';
@@ -48,7 +49,13 @@ export class UsersService {
     const user = await this.findUserOrFail(id);
     if (user.isSuperAdmin) throw new BadRequestException('Não é permitido remover o superadmin pela aplicação.');
     assertCanManage(actor, user.role);
-    await this.usersRepository.softDelete(id);
+    // Alunos sob guarda ou vinculados à conta são inativados (não apagados, para manter o histórico).
+    await this.usersRepository.manager.transaction(async (manager) => {
+      const students = manager.getRepository(Student);
+      await students.update({ guardianId: id }, { active: false });
+      await students.update({ accountId: id }, { active: false });
+      await manager.getRepository(User).softDelete(id);
+    });
   }
 
   private async setPassword(user: User, newPassword: string): Promise<void> {
