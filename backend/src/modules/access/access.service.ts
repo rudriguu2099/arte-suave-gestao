@@ -14,7 +14,7 @@ import { assertCanManage } from '../../common/utils/can-manage.util.js';
 import { User } from '../users/entities/user.entity.js';
 import { Student } from './entities/student.entity.js';
 import { SchoolGroup } from './entities/school-group.entity.js';
-import { ProfileDto } from './dto/profile.dto.js';
+import { ProfileDto, UpdateProfileDto } from './dto/profile.dto.js';
 import { ageOn, birthDateToIso, displayDate } from './access.validation.js';
 import type {
   AccessAccount,
@@ -69,6 +69,15 @@ export class AccessService implements OnApplicationBootstrap {
         )
         .map((student) => student.id),
     };
+  }
+
+  async me(actorId: string): Promise<AccessAccount> {
+    const user = await this.database.getRepository(User).findOneBy({ id: actorId });
+    if (!user?.isActive) throw new UnauthorizedException('Conta indisponível.');
+    const students = await this.database.getRepository(Student).findBy(
+      user.role === Role.RESPONSAVEL ? { guardianId: user.id } : { accountId: user.id },
+    );
+    return this.accountView(user, students);
   }
 
   async state(actorId: string): Promise<AccessState> {
@@ -146,6 +155,49 @@ export class AccessService implements OnApplicationBootstrap {
     }
   }
 
+  private async loadTarget(
+    manager: EntityManager,
+    target: ProfileTarget,
+  ): Promise<{ account: User | null; student: Student | null }> {
+    const users = manager.getRepository(User);
+    const pupils = manager.getRepository(Student);
+    if (target.kind === 'account') {
+      const account = await users.findOneBy({ id: target.id });
+      if (!account) throw new NotFoundException('Conta não encontrada.');
+      return { account, student: await pupils.findOneBy({ accountId: account.id }) };
+    }
+    const student = await pupils.findOneBy({ id: target.id });
+    if (!student) throw new NotFoundException('Aluno não encontrado.');
+    const account = student.accountId
+      ? await users.findOneBy({ id: student.accountId })
+      : null;
+    return { account, student };
+  }
+
+  // Edição parcial: completa o que não veio com os dados atuais e segue o fluxo completo de validação.
+  async updateProfile(
+    actorId: string,
+    patch: UpdateProfileDto,
+    target: ProfileTarget,
+  ): Promise<ProfileResult> {
+    const { account, student } = await this.loadTarget(this.database.manager, target);
+    const current: ProfileDto = {
+      name: (account ?? student!).name,
+      birthDate: displayDate((account ?? student!).birthDate),
+      role: account ? uiRoles[account.role] : 'athlete',
+      emails: account
+        ? account.contactEmails?.length ? account.contactEmails : [account.email]
+        : student!.emails,
+      phones: account?.phones ?? student!.phones,
+      groupId: student?.groupId,
+      guardianId: student?.guardianId ?? undefined,
+    };
+    const sent = Object.fromEntries(
+      Object.entries(patch).filter(([, value]) => value !== undefined),
+    );
+    return this.saveProfile(actorId, { ...current, ...sent }, target);
+  }
+
   async saveProfile(
     actorId: string,
     dto: ProfileDto,
@@ -173,19 +225,9 @@ export class AccessService implements OnApplicationBootstrap {
       assertCanManage(actor, databaseRoles[dto.role]);
       const users = manager.getRepository(User);
       const pupils = manager.getRepository(Student);
-      let account: User | null = null;
-      let student: Student | null = null;
-      if (target?.kind === 'account') {
-        account = await users.findOneBy({ id: target.id });
-        if (!account) throw new NotFoundException('Conta não encontrada.');
-        student = await pupils.findOneBy({ accountId: account.id });
-      } else if (target?.kind === 'athlete') {
-        student = await pupils.findOneBy({ id: target.id });
-        if (!student) throw new NotFoundException('Aluno não encontrado.');
-        account = student.accountId
-          ? await users.findOneBy({ id: student.accountId })
-          : null;
-      }
+      let { account, student } = target
+        ? await this.loadTarget(manager, target)
+        : { account: null as User | null, student: null as Student | null };
       assertCanManage(actor, account?.role);
       if (account?.isSuperAdmin && dto.role !== 'admin')
         throw new BadRequestException(
@@ -302,18 +344,7 @@ export class AccessService implements OnApplicationBootstrap {
       assertCanManage(actor, undefined);
       const users = manager.getRepository(User);
       const pupils = manager.getRepository(Student);
-      let account: User | null = null;
-      let student: Student | null = null;
-      if (target.kind === 'account') {
-        account = await users.findOneBy({ id: target.id });
-        if (!account) throw new NotFoundException('Conta não encontrada.');
-      } else {
-        student = await pupils.findOneBy({ id: target.id });
-        if (!student) throw new NotFoundException('Aluno não encontrado.');
-        account = student.accountId
-          ? await users.findOneBy({ id: student.accountId })
-          : null;
-      }
+      const { account, student } = await this.loadTarget(manager, target);
       if (account) {
         assertCanManage(actor, account.role);
         if (account.isSuperAdmin)

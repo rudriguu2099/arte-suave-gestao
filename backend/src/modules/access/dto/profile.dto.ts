@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
@@ -43,3 +43,6 @@ export class ProfileDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'Responsável ativo; obrigatório para atleta menor de idade' })
   @IsOptional() @IsUUID() guardianId?: string;
 }
+
+// PATCH: só o que mudar; o resto é completado com os dados atuais.
+export class UpdateProfileDto extends PartialType(ProfileDto) {}

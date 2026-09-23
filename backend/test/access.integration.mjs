@@ -68,6 +68,11 @@ try {
   );
   const initial = await state(root);
   assert.equal(initial.current.isSuperAdmin, true);
+  assert.deepEqual(
+    await call('/access/me', 'GET', undefined, root),
+    initial.current,
+  );
+  await call('/access/me', 'GET', undefined, undefined, 401);
   await call('/access/state', 'GET', undefined, undefined, 401);
   const guardian = await create('responsible', 'Álvaro Teste', '05/09/1980');
   assert.equal(guardian.result.password, 'álv05091980');
@@ -163,7 +168,7 @@ try {
   await call(
     '/access/profiles/account/' + adult.row.id,
     'PATCH',
-    { ...adult.profile, name: 'Érica Atualizada' },
+    { name: 'Érica Atualizada' },
     root,
   );
   assert.equal((await state(adultToken)).athletes[0].name, 'Érica Atualizada');

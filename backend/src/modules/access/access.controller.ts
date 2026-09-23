@@ -27,8 +27,8 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { AccessService } from './access.service.js';
-import { ProfileDto } from './dto/profile.dto.js';
-import { AccessState, ProfileResult } from './access.contract.js';
+import { ProfileDto, UpdateProfileDto } from './dto/profile.dto.js';
+import { AccessAccount, AccessState, ProfileResult } from './access.contract.js';
 import type { JwtPayload } from '../auth/auth.service.js';
 
 @ApiTags('access')
@@ -39,6 +39,16 @@ import type { JwtPayload } from '../auth/auth.service.js';
 @Controller('access')
 export class AccessController {
   constructor(private readonly service: AccessService) {}
+  @ApiOperation({
+    summary: 'Dados da conta logada',
+    description: 'Versão leve do `current` de /access/state.',
+  })
+  @ApiOkResponse({ type: AccessAccount })
+  @Get('me')
+  me(@Req() request: { user: JwtPayload }) {
+    return this.service.me(request.user.id);
+  }
+
   @ApiOperation({
     summary: 'Estado visível para a conta logada',
     description: 'Administradores veem todas as contas e alunos; responsável, só seus alunos; atleta, só o próprio registro.',
@@ -66,7 +76,10 @@ export class AccessController {
     return this.service.saveProfile(request.user.id, dto);
   }
 
-  @ApiOperation({ summary: 'Edita um perfil a partir da conta de acesso' })
+  @ApiOperation({
+    summary: 'Edita um perfil a partir da conta de acesso',
+    description: 'Envie só os campos que mudam; o resto é mantido.',
+  })
   @ApiParam({ name: 'id', format: 'uuid', description: 'id da conta (AccessAccount.id)' })
   @ApiOkResponse({ type: ProfileResult })
   @ApiBadRequestResponse({
@@ -80,9 +93,9 @@ export class AccessController {
   updateAccount(
     @Req() request: { user: JwtPayload },
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ProfileDto,
+    @Body() dto: UpdateProfileDto,
   ) {
-    return this.service.saveProfile(request.user.id, dto, {
+    return this.service.updateProfile(request.user.id, dto, {
       kind: 'account',
       id,
     });
@@ -90,7 +103,7 @@ export class AccessController {
 
   @ApiOperation({
     summary: 'Edita um perfil a partir do registro de aluno',
-    description: 'Use este caminho para atletas menores, que não têm conta.',
+    description: 'Use este caminho para atletas menores, que não têm conta. Envie só os campos que mudam; o resto é mantido.',
   })
   @ApiParam({ name: 'id', format: 'uuid', description: 'id do aluno (AccessStudent.id)' })
   @ApiOkResponse({ type: ProfileResult })
@@ -105,9 +118,9 @@ export class AccessController {
   updateStudent(
     @Req() request: { user: JwtPayload },
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ProfileDto,
+    @Body() dto: UpdateProfileDto,
   ) {
-    return this.service.saveProfile(request.user.id, dto, {
+    return this.service.updateProfile(request.user.id, dto, {
       kind: 'athlete',
       id,
     });
