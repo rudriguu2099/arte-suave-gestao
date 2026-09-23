@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   OnApplicationBootstrap,
@@ -11,6 +10,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Role } from '../../common/enums/role.enum.js';
 import { generateInitialPassword } from '../../common/utils/password-generator.util.js';
+import { assertCanManage } from '../../common/utils/can-manage.util.js';
 import { User } from '../users/entities/user.entity.js';
 import { Student } from './entities/student.entity.js';
 import { SchoolGroup } from './entities/school-group.entity.js';
@@ -78,7 +78,6 @@ export class AccessService implements OnApplicationBootstrap {
       if (!current?.isActive)
         throw new UnauthorizedException('Conta indisponível.');
       const staff = current.role === Role.ADMINISTRADOR;
-      const root = staff && current.isSuperAdmin;
       const students = await manager.getRepository(Student).find({
         where: staff
           ? {}
@@ -87,7 +86,7 @@ export class AccessService implements OnApplicationBootstrap {
             : { accountId: current.id },
         order: { name: 'ASC' },
       });
-      const accounts = root
+      const accounts = staff
         ? await users.find({ order: { name: 'ASC' } })
         : [current];
       const allGroups = await manager
@@ -121,19 +120,12 @@ export class AccessService implements OnApplicationBootstrap {
     });
   }
 
-  private async requireSuperAdmin(manager: EntityManager, actorId: string) {
+  private async lockActor(manager: EntityManager, actorId: string): Promise<User> {
     const actor = await manager
       .getRepository(User)
       .findOne({ where: { id: actorId }, lock: { mode: 'pessimistic_write' } });
-    if (
-      !actor?.isActive ||
-      actor.role !== Role.ADMINISTRADOR ||
-      !actor.isSuperAdmin
-    ) {
-      throw new ForbiddenException(
-        'Somente o superadmin pode gerenciar cadastros.',
-      );
-    }
+    if (!actor?.isActive) throw new UnauthorizedException('Conta indisponível.');
+    return actor;
   }
 
   private async transaction<T>(
@@ -177,7 +169,8 @@ export class AccessService implements OnApplicationBootstrap {
       );
 
     return this.transaction(async (manager) => {
-      await this.requireSuperAdmin(manager, actorId);
+      const actor = await this.lockActor(manager, actorId);
+      assertCanManage(actor, databaseRoles[dto.role]);
       const users = manager.getRepository(User);
       const pupils = manager.getRepository(Student);
       let account: User | null = null;
@@ -193,6 +186,7 @@ export class AccessService implements OnApplicationBootstrap {
           ? await users.findOneBy({ id: student.accountId })
           : null;
       }
+      assertCanManage(actor, account?.role);
       if (account?.isSuperAdmin && dto.role !== 'admin')
         throw new BadRequestException(
           'O superadmin é provisionado pelo servidor.',
@@ -304,7 +298,8 @@ export class AccessService implements OnApplicationBootstrap {
 
   async toggleActive(actorId: string, target: ProfileTarget): Promise<void> {
     await this.transaction(async (manager) => {
-      await this.requireSuperAdmin(manager, actorId);
+      const actor = await this.lockActor(manager, actorId);
+      assertCanManage(actor, undefined);
       const users = manager.getRepository(User);
       const pupils = manager.getRepository(Student);
       let account: User | null = null;
@@ -320,6 +315,7 @@ export class AccessService implements OnApplicationBootstrap {
           : null;
       }
       if (account) {
+        assertCanManage(actor, account.role);
         if (account.isSuperAdmin)
           throw new BadRequestException(
             'O superadmin não pode ser inativado pela aplicação.',

@@ -11,14 +11,17 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
-import { SuperAdminGuard } from '../../common/guards/superadmin.guard.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Role } from '../../common/enums/role.enum.js';
 import { AccessService } from './access.service.js';
 import { ProfileDto } from './dto/profile.dto.js';
 import type { JwtPayload } from '../auth/auth.service.js';
 
 @ApiTags('access')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+// Superadmin gerencia todos; administrador só responsáveis e atletas (regra em assertCanManage).
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('access')
 export class AccessController {
   constructor(private readonly service: AccessService) {}
@@ -28,13 +31,13 @@ export class AccessController {
   }
 
   @Post('profiles')
-  @UseGuards(SuperAdminGuard)
+  @Roles(Role.ADMINISTRADOR)
   create(@Req() request: { user: JwtPayload }, @Body() dto: ProfileDto) {
     return this.service.saveProfile(request.user.id, dto);
   }
 
   @Patch('profiles/account/:id')
-  @UseGuards(SuperAdminGuard)
+  @Roles(Role.ADMINISTRADOR)
   updateAccount(
     @Req() request: { user: JwtPayload },
     @Param('id', ParseUUIDPipe) id: string,
@@ -47,7 +50,7 @@ export class AccessController {
   }
 
   @Patch('profiles/athlete/:id')
-  @UseGuards(SuperAdminGuard)
+  @Roles(Role.ADMINISTRADOR)
   updateStudent(
     @Req() request: { user: JwtPayload },
     @Param('id', ParseUUIDPipe) id: string,
@@ -60,7 +63,7 @@ export class AccessController {
   }
 
   @Post('profiles/account/:id/toggle-active')
-  @UseGuards(SuperAdminGuard)
+  @Roles(Role.ADMINISTRADOR)
   toggleAccount(
     @Req() request: { user: JwtPayload },
     @Param('id', ParseUUIDPipe) id: string,
@@ -69,7 +72,7 @@ export class AccessController {
   }
 
   @Post('profiles/athlete/:id/toggle-active')
-  @UseGuards(SuperAdminGuard)
+  @Roles(Role.ADMINISTRADOR)
   toggleStudent(
     @Req() request: { user: JwtPayload },
     @Param('id', ParseUUIDPipe) id: string,
