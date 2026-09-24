@@ -3,7 +3,6 @@ import { useState} from 'react'
 import { View, Alert, Text, Image, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { api } from '../services/api'
 import type { RootStackParamList } from '../routes/types'
-import { useTheme } from '../contexts/ThemeContexts'
 import { styles } from './LoginScreen.styles'
 import { validarObrigatorio, emailValido, senhaValida } from '../utils/validators';
 
@@ -28,7 +27,6 @@ export default function LoginScreen({ navigation } : props) {
     const [loading, setLoading] = useState(false);
     const [erro, setErro] = useState('');
     const [campoInvalido, setCampoInvalido] = useState<'email' | 'senha' | null>(null);
-    const { cores } = useTheme();
 
     async function handleLogin() {
         const emailLimpo = email.trim();
@@ -75,30 +73,30 @@ export default function LoginScreen({ navigation } : props) {
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: cores.fundo }]}>
+        <View style={styles.container}>
             <Image 
-                source = {require('../assets/logo_project.png.jpg')}
+                source={require('../assets/logo_project.png.jpg')}
                 style={styles.logo}
             /> 
-            <Text style={[styles.titulo, { color: cores.texto }]}>ARTE SUAVE</Text>
-            <Text style={[styles.subtitulo, { color: cores.subtexto }]}>ESTILO DE VIDA · QUIXADÁ</Text>
-            <Text style={[styles.secao, {color: cores.texto}]}> ENTRAR </Text>
-            <View style={[styles.linhaSecao, { backgroundColor: cores.texto }]} />
-            <Text style={[styles.label, {color: cores.subtexto}]}> E-MAIL </Text>
+            <Text style={styles.titulo}>ARTE SUAVE</Text>
+            <Text style={styles.subtitulo}>ESTILO DE VIDA · QUIXADÁ</Text>
+            <Text style={styles.secao}> ENTRAR </Text>
+            <View style={styles.linhaSecao} />
+            <Text style={styles.label}> E-MAIL </Text>
             <TextInput
-                style={[styles.input, { backgroundColor: cores.inputFundo, borderColor: campoInvalido === 'email' ? '#DC2626' : cores.inputBorda, color: cores.texto }]}
+                style={[styles.input, campoInvalido === 'email' && styles.inputInvalido]}
                 placeholder="seu@email.com"
-                placeholderTextColor= "rgba(255, 255, 255, 0.25)"
+                placeholderTextColor="#999"
                 autoCapitalize="none"
                 keyboardType="email-address"
                 value={email}
                 onChangeText={setEmail}
             />
-            <Text style={[styles.label, {color: cores.subtexto}]}> SENHA </Text>
+            <Text style={styles.label}> SENHA </Text>
             <TextInput
-                style={[styles.input, { backgroundColor: cores.inputFundo, borderColor: campoInvalido === 'senha' ? '#DC2626' : cores.inputBorda, color: cores.texto }]}
+                style={[styles.input, campoInvalido === 'senha' && styles.inputInvalido]}
                 placeholder="••••••••"
-                placeholderTextColor= "rgba(255, 255, 255, 0.25)"
+                placeholderTextColor="#999"
                 secureTextEntry
                 value={senha}
                 onChangeText={setSenha}
@@ -107,13 +105,13 @@ export default function LoginScreen({ navigation } : props) {
             {erro ? <Text style={styles.erro}>{ erro }</Text> : null}
             <TouchableOpacity 
                 onPress={handleLogin}
-                style ={[styles.botao, {backgroundColor: cores.botaoFundo}, loading && styles.botaoDesativado]}
+                style={[styles.botao, loading && styles.botaoDesativado]}
                 disabled={loading}
             >
             {loading ? (
-                <ActivityIndicator color={cores.botaoTexto} />
+                <ActivityIndicator color="#fff" />
             ) : (
-                <Text style={[styles.botaoTexto, { color: cores.botaoTexto }]}>ACESSAR</Text>
+                <Text style={styles.botaoTexto}>ACESSAR</Text>
             )}
             </TouchableOpacity>
             <BarraColorida/>
