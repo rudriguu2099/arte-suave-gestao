@@ -81,7 +81,7 @@ export default function LoginScreen() {
             <TextInput
                 style={[styles.input, { backgroundColor: cores.inputFundo, borderColor: campoInvalido === 'email' ? '#DC2626' : cores.inputBorda, color: cores.texto }]}
                 placeholder="seu@email.com"
-                placeholderTextColor={cores.subtexto}
+                placeholderTextColor= "rgba(255, 255, 255, 0.25)"
                 autoCapitalize="none"
                 keyboardType="email-address"
                 value={email}
@@ -91,6 +91,7 @@ export default function LoginScreen() {
             <TextInput
                 style={[styles.input, { backgroundColor: cores.inputFundo, borderColor: campoInvalido === 'senha' ? '#DC2626' : cores.inputBorda, color: cores.texto }]}
                 placeholder="••••••••"
+                placeholderTextColor= "rgba(255, 255, 255, 0.25)"
                 secureTextEntry
                 value={senha}
                 onChangeText={setSenha}
