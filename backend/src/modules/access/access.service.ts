@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   OnApplicationBootstrap,
@@ -11,10 +10,11 @@ import { DataSource, EntityManager } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Role } from '../../common/enums/role.enum.js';
 import { generateInitialPassword } from '../../common/utils/password-generator.util.js';
+import { assertCanManage } from '../../common/utils/can-manage.util.js';
 import { User } from '../users/entities/user.entity.js';
 import { Student } from './entities/student.entity.js';
 import { SchoolGroup } from './entities/school-group.entity.js';
-import { ProfileDto } from './dto/profile.dto.js';
+import { ProfileDto, UpdateProfileDto } from './dto/profile.dto.js';
 import { ageOn, birthDateToIso, displayDate } from './access.validation.js';
 import type {
   AccessAccount,
@@ -71,6 +71,15 @@ export class AccessService implements OnApplicationBootstrap {
     };
   }
 
+  async me(actorId: string): Promise<AccessAccount> {
+    const user = await this.database.getRepository(User).findOneBy({ id: actorId });
+    if (!user?.isActive) throw new UnauthorizedException('Conta indisponível.');
+    const students = await this.database.getRepository(Student).findBy(
+      user.role === Role.RESPONSAVEL ? { guardianId: user.id } : { accountId: user.id },
+    );
+    return this.accountView(user, students);
+  }
+
   async state(actorId: string): Promise<AccessState> {
     return this.database.transaction('REPEATABLE READ', async (manager) => {
       const users = manager.getRepository(User);
@@ -78,7 +87,6 @@ export class AccessService implements OnApplicationBootstrap {
       if (!current?.isActive)
         throw new UnauthorizedException('Conta indisponível.');
       const staff = current.role === Role.ADMINISTRADOR;
-      const root = staff && current.isSuperAdmin;
       const students = await manager.getRepository(Student).find({
         where: staff
           ? {}
@@ -87,7 +95,7 @@ export class AccessService implements OnApplicationBootstrap {
             : { accountId: current.id },
         order: { name: 'ASC' },
       });
-      const accounts = root
+      const accounts = staff
         ? await users.find({ order: { name: 'ASC' } })
         : [current];
       const allGroups = await manager
@@ -121,19 +129,12 @@ export class AccessService implements OnApplicationBootstrap {
     });
   }
 
-  private async requireSuperAdmin(manager: EntityManager, actorId: string) {
+  private async lockActor(manager: EntityManager, actorId: string): Promise<User> {
     const actor = await manager
       .getRepository(User)
       .findOne({ where: { id: actorId }, lock: { mode: 'pessimistic_write' } });
-    if (
-      !actor?.isActive ||
-      actor.role !== Role.ADMINISTRADOR ||
-      !actor.isSuperAdmin
-    ) {
-      throw new ForbiddenException(
-        'Somente o superadmin pode gerenciar cadastros.',
-      );
-    }
+    if (!actor?.isActive) throw new UnauthorizedException('Conta indisponível.');
+    return actor;
   }
 
   private async transaction<T>(
@@ -152,6 +153,49 @@ export class AccessService implements OnApplicationBootstrap {
         throw error;
       }
     }
+  }
+
+  private async loadTarget(
+    manager: EntityManager,
+    target: ProfileTarget,
+  ): Promise<{ account: User | null; student: Student | null }> {
+    const users = manager.getRepository(User);
+    const pupils = manager.getRepository(Student);
+    if (target.kind === 'account') {
+      const account = await users.findOneBy({ id: target.id });
+      if (!account) throw new NotFoundException('Conta não encontrada.');
+      return { account, student: await pupils.findOneBy({ accountId: account.id }) };
+    }
+    const student = await pupils.findOneBy({ id: target.id });
+    if (!student) throw new NotFoundException('Aluno não encontrado.');
+    const account = student.accountId
+      ? await users.findOneBy({ id: student.accountId })
+      : null;
+    return { account, student };
+  }
+
+  // Edição parcial: completa o que não veio com os dados atuais e segue o fluxo completo de validação.
+  async updateProfile(
+    actorId: string,
+    patch: UpdateProfileDto,
+    target: ProfileTarget,
+  ): Promise<ProfileResult> {
+    const { account, student } = await this.loadTarget(this.database.manager, target);
+    const current: ProfileDto = {
+      name: (account ?? student!).name,
+      birthDate: displayDate((account ?? student!).birthDate),
+      role: account ? uiRoles[account.role] : 'athlete',
+      emails: account
+        ? account.contactEmails?.length ? account.contactEmails : [account.email]
+        : student!.emails,
+      phones: account?.phones ?? student!.phones,
+      groupId: student?.groupId,
+      guardianId: student?.guardianId ?? undefined,
+    };
+    const sent = Object.fromEntries(
+      Object.entries(patch).filter(([, value]) => value !== undefined),
+    );
+    return this.saveProfile(actorId, { ...current, ...sent }, target);
   }
 
   async saveProfile(
@@ -177,22 +221,14 @@ export class AccessService implements OnApplicationBootstrap {
       );
 
     return this.transaction(async (manager) => {
-      await this.requireSuperAdmin(manager, actorId);
+      const actor = await this.lockActor(manager, actorId);
+      assertCanManage(actor, databaseRoles[dto.role]);
       const users = manager.getRepository(User);
       const pupils = manager.getRepository(Student);
-      let account: User | null = null;
-      let student: Student | null = null;
-      if (target?.kind === 'account') {
-        account = await users.findOneBy({ id: target.id });
-        if (!account) throw new NotFoundException('Conta não encontrada.');
-        student = await pupils.findOneBy({ accountId: account.id });
-      } else if (target?.kind === 'athlete') {
-        student = await pupils.findOneBy({ id: target.id });
-        if (!student) throw new NotFoundException('Aluno não encontrado.');
-        account = student.accountId
-          ? await users.findOneBy({ id: student.accountId })
-          : null;
-      }
+      let { account, student } = target
+        ? await this.loadTarget(manager, target)
+        : { account: null as User | null, student: null as Student | null };
+      assertCanManage(actor, account?.role);
       if (account?.isSuperAdmin && dto.role !== 'admin')
         throw new BadRequestException(
           'O superadmin é provisionado pelo servidor.',
@@ -304,22 +340,13 @@ export class AccessService implements OnApplicationBootstrap {
 
   async toggleActive(actorId: string, target: ProfileTarget): Promise<void> {
     await this.transaction(async (manager) => {
-      await this.requireSuperAdmin(manager, actorId);
+      const actor = await this.lockActor(manager, actorId);
+      assertCanManage(actor, undefined);
       const users = manager.getRepository(User);
       const pupils = manager.getRepository(Student);
-      let account: User | null = null;
-      let student: Student | null = null;
-      if (target.kind === 'account') {
-        account = await users.findOneBy({ id: target.id });
-        if (!account) throw new NotFoundException('Conta não encontrada.');
-      } else {
-        student = await pupils.findOneBy({ id: target.id });
-        if (!student) throw new NotFoundException('Aluno não encontrado.');
-        account = student.accountId
-          ? await users.findOneBy({ id: student.accountId })
-          : null;
-      }
+      const { account, student } = await this.loadTarget(manager, target);
       if (account) {
+        assertCanManage(actor, account.role);
         if (account.isSuperAdmin)
           throw new BadRequestException(
             'O superadmin não pode ser inativado pela aplicação.',

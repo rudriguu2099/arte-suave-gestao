@@ -8,12 +8,8 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 describe('UsersController', () => {
   let controller: UsersController;
   const usersServiceMock = {
-    create: vi.fn(),
-    findAll: vi.fn(),
-    findOne: vi.fn(),
-    update: vi.fn(),
-    setActive: vi.fn(),
     resetPassword: vi.fn(),
+    remove: vi.fn(),
   };
 
   beforeEach(async () => {

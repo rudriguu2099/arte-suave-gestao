@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   BadRequestException,
-  ConflictException,
+  ForbiddenException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -16,18 +16,27 @@ describe('UsersService', () => {
   let service: UsersService;
   let repository: {
     findOneBy: ReturnType<typeof vi.fn>;
-    find: ReturnType<typeof vi.fn>;
-    create: ReturnType<typeof vi.fn>;
     save: ReturnType<typeof vi.fn>;
+    manager: { transaction: ReturnType<typeof vi.fn> };
   };
+  let studentsRepository: { update: ReturnType<typeof vi.fn> };
+  let usersInTransaction: { softDelete: ReturnType<typeof vi.fn> };
+  const superAdmin = { id: 's1', email: 's@x.com', role: Role.ADMINISTRADOR, isSuperAdmin: true };
+  const admin = { id: 'a1', email: 'a@x.com', role: Role.ADMINISTRADOR, isSuperAdmin: false };
 
   beforeEach(async () => {
     repository = {
       findOneBy: vi.fn(),
-      find: vi.fn(),
-      create: vi.fn((data) => data),
-      save: vi.fn(async (data) => ({ id: 'generated-id', ...data })),
+      save: vi.fn(async (data) => data),
+      manager: { transaction: vi.fn() },
     };
+    studentsRepository = { update: vi.fn() };
+    usersInTransaction = { softDelete: vi.fn() };
+    repository.manager.transaction.mockImplementation(async (work) =>
+      work({
+        getRepository: (entity: unknown) => (entity === User ? usersInTransaction : studentsRepository),
+      }),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [UsersService, { provide: getRepositoryToken(User), useValue: repository }],
@@ -36,134 +45,100 @@ describe('UsersService', () => {
     service = module.get<UsersService>(UsersService);
   });
 
-  describe('create', () => {
-    const dto = {
-      name: 'Rodrigo',
-      email: 'rodrigo@example.com',
-      birthDate: '2002-05-15',
-      role: Role.ATLETA_MAIOR,
-    };
-
-    it('cria o usuário com a senha inicial da RN015 já em hash, sem expor a senha', async () => {
-      repository.findOneBy.mockResolvedValue(null);
-
-      const result = await service.create(dto);
-
-      expect(result).not.toHaveProperty('password');
-      const savedArg = repository.save.mock.calls[0][0];
-      await expect(bcrypt.compare('rod15052002', savedArg.password)).resolves.toBe(true);
-    });
-
-    it('lança ConflictException quando o e-mail já está cadastrado', async () => {
-      repository.findOneBy.mockResolvedValue({ id: 'existing' });
-
-      await expect(service.create(dto)).rejects.toThrow(ConflictException);
-    });
-
-    it('lança BadRequestException ao cadastrar ATLETA_MAIOR menor de 18 anos (RN008)', async () => {
-      repository.findOneBy.mockResolvedValue(null);
-      const minorDto = { ...dto, birthDate: new Date().getFullYear() - 10 + '-01-01' };
-
-      await expect(service.create(minorDto)).rejects.toThrow(BadRequestException);
-    });
-
-    it('permite cadastrar RESPONSAVEL mesmo com a data de nascimento não aplicável à regra de adulto', async () => {
-      repository.findOneBy.mockResolvedValue(null);
-      const responsavelDto = { ...dto, role: Role.RESPONSAVEL };
-
-      await expect(service.create(responsavelDto)).resolves.not.toThrow();
-    });
-  });
-
-  describe('findOne', () => {
-    it('lança NotFoundException quando o usuário não existe', async () => {
-      repository.findOneBy.mockResolvedValue(null);
-
-      await expect(service.findOne('missing-id')).rejects.toThrow(NotFoundException);
-    });
-
-    it('retorna o usuário sem o campo password quando encontrado', async () => {
-      repository.findOneBy.mockResolvedValue({
-        id: 'u1',
-        password: 'hash',
-        name: 'Rodrigo',
-      });
-
-      const result = await service.findOne('u1');
-
-      expect(result).not.toHaveProperty('password');
-    });
-  });
-
-  describe('setActive', () => {
-    it('inativa uma conta existente', async () => {
-      repository.findOneBy.mockResolvedValue({ id: 'u1', isActive: true, password: 'hash' });
-
-      const result = await service.setActive('u1', false);
-
-      expect(result.isActive).toBe(false);
-    });
-
-    it('lança NotFoundException ao tentar (in)ativar um usuário inexistente', async () => {
-      repository.findOneBy.mockResolvedValue(null);
-
-      await expect(service.setActive('missing-id', true)).rejects.toThrow(NotFoundException);
-    });
-  });
-
   describe('changePassword (auto-serviço)', () => {
-    it('lança UnauthorizedException quando a senha atual está incorreta', async () => {
-      repository.findOneBy.mockResolvedValue({
-        id: 'u1',
-        password: await bcrypt.hash('correct', 10),
-      });
+    beforeEach(async () => {
+      repository.findOneBy.mockResolvedValue({ id: 'u1', password: await bcrypt.hash('correct', 10) });
+    });
 
+    it('lança UnauthorizedException quando a senha atual está incorreta', async () => {
       await expect(
         service.changePassword('u1', { currentPassword: 'wrong', newPassword: 'new-password' }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('atualiza a senha (em hash) quando a senha atual está correta', async () => {
-      repository.findOneBy.mockResolvedValue({
-        id: 'u1',
-        password: await bcrypt.hash('correct', 10),
-      });
+    it('lança BadRequestException quando a nova senha é igual à atual', async () => {
+      await expect(
+        service.changePassword('u1', { currentPassword: 'correct', newPassword: 'correct' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.save).not.toHaveBeenCalled();
+    });
 
-      await service.changePassword('u1', {
-        currentPassword: 'correct',
-        newPassword: 'new-password',
-      });
+    it('atualiza a senha (em hash) e invalida as sessões', async () => {
+      await service.changePassword('u1', { currentPassword: 'correct', newPassword: 'new-password' });
 
       const savedArg = repository.save.mock.calls[0][0];
       await expect(bcrypt.compare('new-password', savedArg.password)).resolves.toBe(true);
-    });
-  });
-
-  describe('update', () => {
-    it('atualiza sem birthDate no corpo mesmo com a data vinda do banco como string', async () => {
-      repository.findOneBy.mockResolvedValue({
-        id: 'u1',
-        name: 'Old',
-        role: Role.ATLETA_MAIOR,
-        birthDate: '2002-05-15',
-        password: 'hash',
-      });
-
-      const result = await service.update('u1', { name: 'New' });
-
-      expect(result.name).toBe('New');
-      expect(result).not.toHaveProperty('password');
+      expect(savedArg.tokenVersion).toBe(1);
     });
   });
 
   describe('resetPassword (RF003 - assistida pelo administrador)', () => {
-    it('redefine a senha diretamente, sem exigir a senha atual', async () => {
-      repository.findOneBy.mockResolvedValue({ id: 'u1', password: 'old-hash' });
+    it('redefine a senha de um atleta sem exigir a senha atual', async () => {
+      repository.findOneBy.mockResolvedValue({ id: 'u1', role: Role.ATLETA_MAIOR, password: 'old-hash' });
 
-      await service.resetPassword('u1', 'new-password-123');
+      await service.resetPassword(admin, 'u1', 'new-password-123');
 
       const savedArg = repository.save.mock.calls[0][0];
       await expect(bcrypt.compare('new-password-123', savedArg.password)).resolves.toBe(true);
+    });
+
+    it('administrador não redefine a senha de outro administrador', async () => {
+      repository.findOneBy.mockResolvedValue({ id: 'u2', role: Role.ADMINISTRADOR, password: 'old-hash' });
+
+      await expect(service.resetPassword(admin, 'u2', 'new-password-123')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('superadmin redefine a senha de um administrador', async () => {
+      repository.findOneBy.mockResolvedValue({ id: 'u2', role: Role.ADMINISTRADOR, password: 'old-hash' });
+
+      await expect(service.resetPassword(superAdmin, 'u2', 'new-password-123')).resolves.toBeUndefined();
+    });
+
+    it('lança BadRequestException quando a nova senha é igual à atual', async () => {
+      repository.findOneBy.mockResolvedValue({
+        id: 'u1',
+        role: Role.RESPONSAVEL,
+        password: await bcrypt.hash('same-password', 10),
+      });
+
+      await expect(service.resetPassword(admin, 'u1', 'same-password')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('lança NotFoundException quando o usuário não existe', async () => {
+      repository.findOneBy.mockResolvedValue(null);
+
+      await expect(service.resetPassword(admin, 'missing', 'new-password-123')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('remove', () => {
+    it('administrador remove um responsável e inativa os alunos vinculados', async () => {
+      repository.findOneBy.mockResolvedValue({ id: 'u1', role: Role.RESPONSAVEL });
+
+      await service.remove(admin, 'u1');
+
+      expect(studentsRepository.update).toHaveBeenCalledWith({ guardianId: 'u1' }, { active: false });
+      expect(studentsRepository.update).toHaveBeenCalledWith({ accountId: 'u1' }, { active: false });
+      expect(usersInTransaction.softDelete).toHaveBeenCalledWith('u1');
+    });
+
+    it('administrador não remove outro administrador', async () => {
+      repository.findOneBy.mockResolvedValue({ id: 'u2', role: Role.ADMINISTRADOR });
+
+      await expect(service.remove(admin, 'u2')).rejects.toThrow(ForbiddenException);
+      expect(repository.manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('ninguém remove o superadmin', async () => {
+      repository.findOneBy.mockResolvedValue({ id: 's1', role: Role.ADMINISTRADOR, isSuperAdmin: true });
+
+      await expect(service.remove(superAdmin, 's1')).rejects.toThrow(BadRequestException);
     });
   });
 });

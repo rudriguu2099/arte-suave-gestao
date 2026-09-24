@@ -68,6 +68,11 @@ try {
   );
   const initial = await state(root);
   assert.equal(initial.current.isSuperAdmin, true);
+  assert.deepEqual(
+    await call('/access/me', 'GET', undefined, root),
+    initial.current,
+  );
+  await call('/access/me', 'GET', undefined, undefined, 401);
   await call('/access/state', 'GET', undefined, undefined, 401);
   const guardian = await create('responsible', 'Álvaro Teste', '05/09/1980');
   assert.equal(guardian.result.password, 'álv05091980');
@@ -83,8 +88,31 @@ try {
     admin.profile.emails[0],
     admin.result.password,
   );
-  await call('/access/profiles', 'POST', guardian.profile, adminToken, 403);
-  await call('/admin/users', 'GET', undefined, adminToken, 403);
+  // Administrador comum: gerencia responsáveis e atletas, nunca outro administrador.
+  const byAdmin = {
+    ...guardian.profile,
+    emails: [marker + '-by-admin@example.com'],
+  };
+  await call('/access/profiles', 'POST', byAdmin, adminToken, 201);
+  ids.push(
+    (await state(root)).accounts.find((a) => a.emails[0] === byAdmin.emails[0])
+      .id,
+  );
+  await call(
+    '/access/profiles',
+    'POST',
+    { ...byAdmin, role: 'admin', emails: [marker + '-admin2@example.com'] },
+    adminToken,
+    403,
+  );
+  await call(
+    '/access/profiles/account/' + initial.current.id + '/toggle-active',
+    'POST',
+    {},
+    adminToken,
+    403,
+  );
+  await call('/access/profiles', 'POST', byAdmin, guardianToken, 403);
   const day = new Date();
   const birth18 =
     String(day.getUTCDate()).padStart(2, '0') +
@@ -140,7 +168,7 @@ try {
   await call(
     '/access/profiles/account/' + adult.row.id,
     'PATCH',
-    { ...adult.profile, name: 'Érica Atualizada' },
+    { name: 'Érica Atualizada' },
     root,
   );
   assert.equal((await state(adultToken)).athletes[0].name, 'Érica Atualizada');
@@ -179,6 +207,13 @@ try {
   await call(
     '/auth/change-password',
     'POST',
+    { currentPassword: 'NovaSenha123', newPassword: 'NovaSenha123' },
+    renewed,
+    400,
+  );
+  await call(
+    '/auth/change-password',
+    'POST',
     { currentPassword: 'NovaSenha123', newPassword: 'MinhaSenha456' },
     renewed,
     201,
@@ -204,6 +239,20 @@ try {
     root,
     400,
   );
+  // Reativa o menor e remove o responsável: o aluno deve ser inativado em cascata.
+  await call(
+    '/access/profiles/athlete/' + minorId + '/toggle-active',
+    'POST',
+    {},
+    root,
+    201,
+  );
+  await call('/admin/users/' + guardian.row.id, 'DELETE', undefined, root, 204);
+  const orphan = await db.query('SELECT active FROM students WHERE id=$1', [
+    minorId,
+  ]);
+  assert.equal(orphan.rows[0].active, false);
+  await call('/auth/login', 'POST', { email: guardian.profile.emails[0], password: guardian.result.password }, undefined, 401);
   console.log(
     'PASS: ' +
       checks +

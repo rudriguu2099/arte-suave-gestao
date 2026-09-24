@@ -40,7 +40,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Altera a própria senha (RF005)' })
   @ApiCreatedResponse({ description: 'Senha alterada (sem corpo)' })
-  @ApiBadRequestResponse({ description: 'Nova senha com menos de 6 caracteres' })
+  @ApiBadRequestResponse({ description: 'Nova senha com menos de 6 caracteres ou igual à atual' })
   @ApiUnauthorizedResponse({ description: 'Token ausente/inválido ou senha atual incorreta' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)

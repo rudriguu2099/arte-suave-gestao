@@ -6,9 +6,12 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   DeleteDateColumn,
+  Index,
 } from 'typeorm';
 import { Role } from '../../../common/enums/role.enum.js';
 
+// Garante no banco que existe no máximo um superadmin.
+@Index('UQ_users_single_superadmin', ['isSuperAdmin'], { unique: true, where: '"isSuperAdmin" = true' })
 @Entity('users')
 export class User {
   @ApiProperty({ format: 'uuid' })
