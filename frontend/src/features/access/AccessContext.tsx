@@ -10,7 +10,8 @@ import {
 import { AppState } from "react-native";
 import { accessApi, type AccessState } from "../../services/accessApi";
 import { ApiError } from "../../services/api";
-import { canChangePassword, validateNewPassword } from "./domain";
+import { canChangePassword, requireManageProfile, validateNewPassword } from "./domain";
+import { findProfile } from "./profiles";
 import type {
   Account,
   Event,
@@ -111,11 +112,17 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     return token.current;
   }
   async function saveProfile(input: ProfileInput, target?: ProfileTarget) {
+    const { account } = findProfile(data, target);
+    requireManageProfile(data.current, account?.role);
+    requireManageProfile(data.current, input.role);
     const result = await accessApi.saveProfile(requireToken(), input, target);
     await refresh(); // A refresh failure never retries an already committed write.
     return result;
   }
   async function toggleActive(target: ProfileTarget) {
+    const { account } = findProfile(data, target);
+    requireManageProfile(data.current, account?.role);
+    if (account?.isSuperAdmin) throw new Error("O acesso do superadmin é gerenciado no banco de dados.");
     await accessApi.toggleActive(requireToken(), target);
     await refresh();
   }
@@ -125,7 +132,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     confirmation: string,
     currentPassword = "",
   ) {
-    if (!canChangePassword(data.current, id))
+    if (!canChangePassword(data.current, id, data.accounts.find((account) => account.id === id)?.role))
       throw new Error("Você não tem permissão para alterar esta senha.");
     validateNewPassword(password, confirmation);
     if (password.length < 6)

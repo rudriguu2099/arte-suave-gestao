@@ -133,27 +133,27 @@ test("administrator profile never gets the superadmin flag, even with a forged p
     /função válida/,
   );
 });
-test("ordinary admins and other users cannot create, edit or change activation", () => {
+test("non-administrators cannot create, edit or change activation", () => {
   const state = fresh();
-  for (const actorId of [null, "admin", "responsible", "athlete", "inactive"]) {
+  for (const actorId of [null, "responsible", "athlete", "inactive"]) {
     assert.throws(
       () => saveProfile(state, actorId, input(), groups),
-      /superadmin/,
+      /administradores/,
     );
     assert.throws(
       () =>
         saveProfile(state, actorId, input(), groups, { accountId: "admin" }),
-      /superadmin/,
+      /administradores/,
     );
     assert.throws(
       () => toggleProfileActive(state, actorId, { accountId: "athlete" }),
-      /superadmin/,
+      /administradores/,
     );
   }
   state.accounts.find((account) => account.id === "superadmin").active = false;
   assert.throws(
     () => saveProfile(state, "superadmin", input(), groups),
-    /superadmin/,
+    /administradores/,
   );
 });
 test("database superadmin flag survives edits and cannot be demoted or deactivated through UI", () => {
@@ -285,7 +285,7 @@ test("student access and account management visibility match each profile", () =
   );
   assert.deepEqual(
     visibleData(state, current("admin")).accounts.map((account) => account.id),
-    ["admin"],
+    state.accounts.map((account) => account.id),
   );
   assert.equal(
     visibleData(state, current("admin")).athletes.length,
@@ -328,4 +328,35 @@ test("responsible with linked students cannot switch roles and orphan them", () 
       save(state, { ...guardian, role: "admin" }, { accountId: guardian.id }),
     /Reatribua/,
   );
+});
+
+
+test("ordinary admin manages responsible, adult athlete and minor profiles", () => {
+  for (const value of [input({ role: "responsible" }), input(), minor()]) {
+    const created = saveProfile(fresh(), "admin", value, groups);
+    const target = created.result.hasAccess
+      ? { accountId: created.state.accounts.at(-1).id }
+      : { athleteId: created.state.athletes.at(-1).id };
+    const updated = saveProfile(created.state, "admin", { ...value, name: "Nome atualizado" }, groups, target);
+    assert.equal(updated.result.name, "Nome atualizado");
+    const inactive = toggleProfileActive(updated.state, "admin", target);
+    const row = profileRows(inactive).find(row => target.accountId ? row.accountId === target.accountId : row.target.athleteId === target.athleteId);
+    assert.equal(row.active, false);
+    const active = toggleProfileActive(inactive, "admin", target);
+    assert.equal(profileRows(active).find(item => item.key === row.key).active, true);
+  }
+});
+
+test("ordinary admin cannot create, promote, edit, demote or deactivate administrators", () => {
+  const state = fresh();
+  assert.throws(() => saveProfile(state, "admin", input({role: "admin"}), groups), /administradores/);
+  assert.throws(() => saveProfile(state, "admin", input({role: "admin"}), groups, {accountId: "athlete"}), /administradores/);
+  for (const accountId of ["admin", "superadmin"]) {
+    for (const role of ["admin", "responsible"]) {
+      assert.throws(() => saveProfile(state, "admin", input({role}), groups, {accountId}), /administradores/);
+    }
+    assert.throws(() => toggleProfileActive(state, "admin", {accountId}), /administradores/);
+  }
+  state.accounts.find(account => account.id === "admin").active = false;
+  assert.throws(() => saveProfile(state, "admin", input(), groups), /administradores/);
 });

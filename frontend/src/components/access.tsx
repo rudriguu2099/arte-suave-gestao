@@ -32,6 +32,7 @@ export function AdminFooter({
       ] as const)
     : ([
         { route: "Home", icon: "home", label: "Início" },
+        { route: "Accounts", icon: "people-outline", label: "Contas" },
         { route: "Groups", icon: "content-copy", label: "Turmas" },
         { route: "Students", icon: "people-outline", label: "Alunos" },
         { route: "Attendance", icon: "fact-check", label: "Frequência" },

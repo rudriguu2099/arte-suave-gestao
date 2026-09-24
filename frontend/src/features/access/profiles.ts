@@ -2,8 +2,7 @@ import {
   ageOn,
   initialPassword,
   isStaff,
-  isSuperAdmin,
-  requireSuperAdmin,
+  requireManageProfile,
   validateAccount,
   validateContacts,
 } from "./domain.ts";
@@ -65,9 +64,8 @@ export function saveProfile(
   groups: Group[],
   target?: ProfileTarget,
 ): { state: ProfileState; result: ProfileResult } {
-  requireSuperAdmin(
-    state.accounts.find((account) => account.id === actorId) ?? null,
-  );
+  const actor = state.accounts.find((account) => account.id === actorId) ?? null;
+  requireManageProfile(actor);
   // Explicit allow-list: never copy isSuperAdmin (or an id/active flag) from a form payload.
   const input: ProfileInput = {
     name: raw.name.trim(),
@@ -87,6 +85,8 @@ export function saveProfile(
   if (age < 0)
     throw new Error("Informe uma data de nascimento válida em DD/MM/AAAA.");
   const { account: existing, athlete: student } = findProfile(state, target);
+  requireManageProfile(actor, existing?.role);
+  requireManageProfile(actor, input.role);
   if (existing?.isSuperAdmin && input.role !== "admin")
     throw new Error("O perfil do superadmin é definido no banco de dados.");
   if (
@@ -185,10 +185,10 @@ export function toggleProfileActive(
   actorId: string | null,
   target: ProfileTarget,
 ): ProfileState {
-  requireSuperAdmin(
-    state.accounts.find((account) => account.id === actorId) ?? null,
-  );
+  const actor = state.accounts.find((account) => account.id === actorId) ?? null;
+  requireManageProfile(actor);
   const { account, athlete } = findProfile(state, target);
+  requireManageProfile(actor, account?.role);
   if (account?.isSuperAdmin)
     throw new Error("O acesso do superadmin é gerenciado no banco de dados.");
   if (account)
@@ -212,7 +212,7 @@ export function visibleData(
 ): ProfileState {
   if (!current?.active) return { accounts: [], athletes: [] };
   return {
-    accounts: isSuperAdmin(current) ? state.accounts : [current],
+    accounts: isStaff(current) ? state.accounts : [current],
     athletes: isStaff(current)
       ? state.athletes
       : state.athletes.filter((athlete) =>

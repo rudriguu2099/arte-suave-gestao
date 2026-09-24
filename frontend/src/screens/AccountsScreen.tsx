@@ -13,7 +13,7 @@ import {
   styles,
 } from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
-import { isSuperAdmin } from "../features/access/domain";
+import { isStaff, canManageProfile, canChangePassword } from "../features/access/domain";
 import { profileRows } from "../features/access/profiles";
 import { roleLabels, type RootStackParamList } from "../features/access/types";
 
@@ -27,7 +27,7 @@ export default function AccountsScreen({
     ReturnType<typeof profileRows>[number] | null
   >(null);
   const [busy, setBusy] = useState(false);
-  if (!isSuperAdmin(current)) return null;
+  if (!isStaff(current)) return null;
   const rows = profileRows({ accounts, athletes });
   const filtered = rows.filter((row) =>
     (
@@ -126,13 +126,15 @@ export default function AccountsScreen({
                 </Text>
               )}
               <View style={styles.wrap}>
-                <Button
-                  title="EDITAR"
-                  compact
-                  secondary
-                  onPress={() => navigation.navigate("AccountForm", row.target)}
-                />
-                {!row.isSuperAdmin && (
+                {canManageProfile(current, row.role) && (
+                  <Button
+                    title="EDITAR"
+                    compact
+                    secondary
+                    onPress={() => navigation.navigate("AccountForm", row.target)}
+                  />
+                )}
+                {canManageProfile(current, row.role) && !row.isSuperAdmin && (
                   <Button
                     title={row.active ? "INATIVAR" : "ATIVAR"}
                     compact
@@ -140,9 +142,9 @@ export default function AccountsScreen({
                     onPress={() => setPending(row)}
                   />
                 )}
-                {row.hasAccess && row.accountId && (
+                {row.hasAccess && row.accountId && canChangePassword(current, row.accountId, row.role) && (
                   <Button
-                    title="REDEFINIR SENHA"
+                    title={row.accountId === current?.id ? "ALTERAR MINHA SENHA" : "REDEFINIR SENHA"}
                     compact
                     secondary
                     onPress={() =>
