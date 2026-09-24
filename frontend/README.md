@@ -23,6 +23,16 @@ npx expo start
 
 Escaneie o QR code exibido no terminal com o app **Expo Go** (Android) ou a câmera do iPhone (iOS).
 
+## Telas de perfis de acesso
+
+O modo de desenvolvimento permite experimentar superadmin, administrador,
+responsável e atleta com dados fictícios. O cadastro de todos os perfis e alunos
+é feito exclusivamente pelo superadmin em Gerenciamento de Contas.
+Consulte [o guia dos fluxos e da integração](docs/perfis-de-acesso.md) para RN015,
+limitações da demonstração, pontos de integração com o login/API e roteiro de testes.
+
+Verificações: `npm run typecheck` e `npm test` (Node.js 22.6+).
+
 ## Estrutura de pastas
 
 frontend/

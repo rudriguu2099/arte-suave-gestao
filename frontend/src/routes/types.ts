@@ -1,4 +1,1 @@
-export type RootStackParamList = {
-  Login: undefined;
-  Home: undefined;
-};
+export type { RootStackParamList } from "../features/access/types";

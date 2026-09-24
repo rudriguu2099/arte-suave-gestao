@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native"
+import { colors } from "../components/ui"
 
 const TAMANHO_LOGO = 150;
 
@@ -7,7 +8,7 @@ export const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: colors.paper,
         paddingHorizontal: 24,
     },
     logo: {
@@ -16,7 +17,7 @@ export const styles = StyleSheet.create({
         borderRadius: TAMANHO_LOGO / 2, 
     },
     secao: {
-        color: '#111',
+        color: colors.ink,
         alignSelf: 'flex-start',
         fontSize: 14,
         fontWeight: 700,
@@ -24,7 +25,7 @@ export const styles = StyleSheet.create({
         marginBottom: 16,
     },
     label: {
-        color: '#666',
+        color: colors.muted,
         alignSelf: 'flex-start',
         fontSize: 12,
         fontWeight: 600,
@@ -36,21 +37,21 @@ export const styles = StyleSheet.create({
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 10,
-        borderColor: '#ddd',
-        backgroundColor: '#f2f2f2',
-        color: '#111',
+        borderColor: colors.border,
+        backgroundColor: colors.background,
+        color: colors.ink,
         marginBottom: 16,
         fontSize: 14,
     },
     erro: {
-        color: '#D62626',
+        color: colors.error,
         alignSelf: 'center',
         marginBottom: 12,
     },
     botao: {
         width: '100%',
         borderRadius: 8,
-        backgroundColor: '#111',
+        backgroundColor: colors.ink,
         paddingVertical: 14,
         alignItems: 'center',
         marginTop: 8,
@@ -60,19 +61,19 @@ export const styles = StyleSheet.create({
         opacity: 0.6,
     },
     botaoTexto: {
-        color: '#fff',
+        color: colors.paper,
         fontSize: 14,
         fontWeight: 700
     },
     titulo: {
-        color: '#111',
+        color: colors.ink,
         fontSize: 20,
         fontWeight: '700',
         letterSpacing: 1,
         marginTop: 16,
     },
     subtitulo: {
-        color: '#666',
+        color: colors.muted,
         fontSize: 11,
         fontWeight: '500',
         letterSpacing: 1,
@@ -85,7 +86,7 @@ export const styles = StyleSheet.create({
         height: 6,
     },
     linhaSecao: {
-        backgroundColor: '#111',
+        backgroundColor: colors.ink,
         width: 60,
         height: 2,
         borderRadius: 2,
@@ -93,6 +94,10 @@ export const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     inputInvalido: {
-        borderColor: '#DC2626',
+        borderColor: colors.error,
+    },
+    mensagemSessao: {
+        color: colors.ink,
+        marginBottom: 12,
     },
 });

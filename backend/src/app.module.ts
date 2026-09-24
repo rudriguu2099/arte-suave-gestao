@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import configuration from './config/configuration.js';
+import { UsersModule } from './modules/users/users.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
+import { AccessModule } from './modules/access/access.module.js';
 
 @Module({
   imports: [
@@ -11,6 +15,23 @@ import configuration from './config/configuration.js';
       envFilePath: '.env',
       load: [configuration],
     }),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get<string>('database.host'),
+        port: config.get<number>('database.port'),
+        username: config.get<string>('database.user'),
+        password: config.get<string>('database.password'),
+        database: config.get<string>('database.name'),
+        autoLoadEntities: true,
+        // trocar por migrations quando o schema do banco tiver pronto.
+        synchronize: config.get<string>('nodeEnv') !== 'production',
+      }),
+    }),
+    UsersModule,
+    AuthModule,
+    AccessModule,
   ],
   controllers: [AppController],
   providers: [AppService],
