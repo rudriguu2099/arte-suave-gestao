@@ -32,7 +32,7 @@ export default function PasswordScreen({
   const targetId = route.params?.accountId ?? current?.id;
   const target = accounts.find((account) => account.id === targetId);
   const other = targetId !== current?.id;
-  if (!current || !target || !canChangePassword(current, target.id))
+  if (!current || !target || !canChangePassword(current, target.id, target.role))
     return (
       <Page>
         <Back onPress={navigation.goBack} />

@@ -106,3 +106,14 @@ test("new passwords must be nonempty and match", () => {
     validateNewPassword("MinhaNovaSenha", "MinhaNovaSenha"),
   );
 });
+
+
+test("ordinary admin resets only non-administrative passwords and can change own password", () => {
+  const admin = { ...account, role: "admin" };
+  assert.equal(canChangePassword(admin, "other", "responsible"), true);
+  assert.equal(canChangePassword(admin, "other", "athlete"), true);
+  assert.equal(canChangePassword(admin, "other", "admin"), false);
+  assert.equal(canChangePassword(admin, admin.id, "admin"), true);
+  assert.equal(canChangePassword({ ...admin, active: false }, "other", "athlete"), false);
+  assert.equal(canChangePassword(account, "other", "athlete"), false);
+});

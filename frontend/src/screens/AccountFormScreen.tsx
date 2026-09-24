@@ -21,6 +21,8 @@ import {
   formatBirthDate,
   initialPassword,
   isSuperAdmin,
+  isStaff,
+  canManageProfile,
 } from "../features/access/domain";
 import {
   roleLabels,
@@ -76,7 +78,9 @@ export default function AccountFormScreen({
       /* Wait for complete input. */
     }
   }
-  if (!isSuperAdmin(current)) return null;
+  if (!isStaff(current)) return null;
+  if (existing && !canManageProfile(current, existing.role))
+    return <Page><Back onPress={navigation.goBack} /><ErrorMessage message="Somente o superadmin pode gerenciar administradores." /></Page>;
   if (target && !person)
     return (
       <Page>
@@ -133,7 +137,7 @@ export default function AccountFormScreen({
       <Back onPress={navigation.goBack} />
       <Heading
         title={target ? "EDITAR PERFIL" : "NOVO PERFIL"}
-        subtitle="Cadastro unificado de administradores, responsáveis e alunos."
+        subtitle={isSuperAdmin(current) ? "Cadastro unificado de administradores, responsáveis e alunos." : "Cadastro de responsáveis e alunos."}
       />
       <Section title="Função">
         {existing?.isSuperAdmin ? (
@@ -145,7 +149,7 @@ export default function AccountFormScreen({
           <Select
             label="Função *"
             value={role}
-            options={Object.entries(roleLabels).map(([value, label]) => ({
+            options={Object.entries(roleLabels).filter(([value]) => canManageProfile(current, value as Role)).map(([value, label]) => ({
               value,
               label,
             }))}
@@ -157,8 +161,8 @@ export default function AccountFormScreen({
         )}
         {role === "admin" && !existing?.isSuperAdmin && (
           <Text style={styles.muted}>
-            Acesso a turmas, alunos e frequência. Sem gestão de contas,
-            financeiro ou cadastro de eventos.
+            Acesso a turmas, alunos, frequência e gestão de responsáveis e atletas.
+            Não pode gerenciar administradores, financeiro ou cadastro de eventos.
           </Text>
         )}
         {role === "responsible" && (

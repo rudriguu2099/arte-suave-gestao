@@ -117,9 +117,20 @@ export function requireSuperAdmin(actor: Account | null) {
     throw new Error("Apenas o superadmin pode gerenciar perfis e contas.");
 }
 
+export function canManageProfile(actor: Account | null, role?: Account["role"]): boolean {
+  return isStaff(actor) && (role !== "admin" || isSuperAdmin(actor));
+}
+
+export function requireManageProfile(actor: Account | null, role?: Account["role"]) {
+  if (!canManageProfile(actor, role))
+    throw new Error("Somente administradores autorizados podem gerenciar este perfil.");
+}
+
 export function canChangePassword(
   actor: Account | null,
   accountId: string,
+  targetRole?: Account["role"],
 ): boolean {
-  return !!actor?.active && (actor.id === accountId || isSuperAdmin(actor));
+  return !!actor?.active && (actor.id === accountId || isSuperAdmin(actor) ||
+    (targetRole !== undefined && canManageProfile(actor, targetRole)));
 }

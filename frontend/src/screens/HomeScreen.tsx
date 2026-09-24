@@ -87,7 +87,7 @@ export default function HomeScreen({
               label: "Atletas ativos",
             },
             { value: groups.length, label: "Turmas" },
-            ...(superadmin
+            ...(admin
               ? [
                   { value: accounts.length, label: "Contas" },
                   {
@@ -218,7 +218,7 @@ export default function HomeScreen({
       <View style={{ gap: 12 }}>
         {admin && (
           <>
-            {superadmin && (
+            {admin && (
               <Action
                 title="Gerenciar contas e perfis"
                 onPress={() => navigation.navigate("Accounts")}

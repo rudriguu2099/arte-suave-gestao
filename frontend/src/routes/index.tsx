@@ -20,13 +20,13 @@ export default function Routes() {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Password" component={PasswordScreen} />
         {isStaff(current) && <>
+          <Stack.Screen name="Accounts" component={AccountsScreen} />
+          <Stack.Screen name="AccountForm" component={AccountFormScreen} />
           <Stack.Screen name="Groups" component={GroupsScreen} />
           <Stack.Screen name="Students" component={StudentsScreen} />
           <Stack.Screen name="Attendance" component={AttendanceScreen} />
         </>}
         {isSuperAdmin(current) && <>
-          <Stack.Screen name="Accounts" component={AccountsScreen} />
-          <Stack.Screen name="AccountForm" component={AccountFormScreen} />
           <Stack.Screen name="Finance" component={FinanceScreen} />
           <Stack.Screen name="Events" component={EventsScreen} />
         </>}
