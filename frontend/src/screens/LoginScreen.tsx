@@ -3,7 +3,7 @@ import { useState} from 'react'
 import { View, Text, Image, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { useAccess } from '../features/access/AccessContext'
 import { styles } from './LoginScreen.styles'
-import { validarObrigatorio, emailValido } from '../utils/validators';
+import { validarObrigatorio, emailValido, LIMITE_SENHA } from '../utils/validators';
 
 const CORES_BARRA = ['#3B82F6', '#9333EA', '#92400E', '#0A0A0A', '#DC2626'];
 
@@ -86,6 +86,7 @@ export default function LoginScreen() {
             <TextInput
                 style={[styles.input, campoInvalido === 'senha' && styles.inputInvalido]}
                 placeholder="••••••••"
+                maxLength={LIMITE_SENHA}
                 placeholderTextColor="#929292"
                 secureTextEntry
                 value={senha}

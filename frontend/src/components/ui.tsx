@@ -1,3 +1,4 @@
+import { emailValido, telefoneValido, formatarTelefone } from "../utils/validators";
 import { useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
@@ -312,8 +313,8 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
         {...props}
         accessibilityLabel={label}
         placeholderTextColor="#929292"
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onFocus={(event) => { setFocused(true); props.onFocus?.(event); }}
+        onBlur={(event) => { setFocused(false); props.onBlur?.(event); }}
         style={[
           styles.input,
           focused && { borderColor: colors.ink },
@@ -478,16 +479,18 @@ export function Contacts({
   onChange: (values: string[]) => void;
   required?: boolean;
 }) {
+  const [touched, setTouched] = useState<Record<number, boolean>>({});
   const label = kind === "email" ? "E-mail" : "Telefone";
   return (
     <View style={{ gap: 8 }}>
-      {values.map((value, index) => (
+      {(kind === "email" ? [values[0] ?? ""] : values).map((value, index) => (
         <View key={index} style={{ gap: 4 }}>
           <Field
-            label={`${label} ${index + 1}${required && index === 0 ? " *" : ""}`}
-            value={value}
+            label={`${label}${kind === "phone" ? ` ${index + 1}` : ""}${required && index === 0 ? " *" : ""}`}
+            value={kind === "phone" ? formatarTelefone(value) : value}
+            onBlur={() => setTouched((previous) => ({ ...previous, [index]: true }))}
             onChangeText={(text) =>
-              onChange(values.map((item, i) => (i === index ? text : item)))
+              onChange(kind === "email" ? [text] : values.map((item, i) => (i === index ? formatarTelefone(text) : item)))
             }
             placeholder={
               kind === "email" ? "email@exemplo.com" : "(00) 00000-0000"
@@ -496,7 +499,8 @@ export function Contacts({
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {index > 0 && (
+          {touched[index] && !!value && <ErrorMessage message={(kind === "email" ? emailValido(value) : telefoneValido(value)) ?? ""} />}
+          {kind === "phone" && index > 0 && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Remover ${label} ${index + 1}`}
@@ -512,7 +516,7 @@ export function Contacts({
           )}
         </View>
       ))}
-      <Pressable
+      {kind === "phone" && <Pressable
         accessibilityRole="button"
         onPress={() => onChange([...values, ""])}
         style={{
@@ -521,8 +525,8 @@ export function Contacts({
           alignSelf: "flex-end",
         }}
       >
-        <Text style={styles.muted}>+ Adicionar {label.toLowerCase()}</Text>
-      </Pressable>
+        <Text style={styles.muted}>+ Adicionar telefone</Text>
+      </Pressable>}
     </View>
   );
 }

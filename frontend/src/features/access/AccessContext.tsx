@@ -10,7 +10,7 @@ import {
 import { AppState } from "react-native";
 import { accessApi, type AccessState } from "../../services/accessApi";
 import { ApiError } from "../../services/api";
-import { canChangePassword, requireManageProfile, validateNewPassword } from "./domain";
+import { canChangePassword, requireManageProfile, validateNewPassword, validateContacts, ageOn } from "./domain";
 import { findProfile } from "./profiles";
 import type {
   Account,
@@ -115,6 +115,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     const { account } = findProfile(data, target);
     requireManageProfile(data.current, account?.role);
     requireManageProfile(data.current, input.role);
+    validateContacts(input.emails, input.phones, !(input.role === "athlete" && ageOn(input.birthDate) >= 0 && ageOn(input.birthDate) < 18));
     const result = await accessApi.saveProfile(requireToken(), input, target);
     await refresh(); // A refresh failure never retries an already committed write.
     return result;
@@ -134,9 +135,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   ) {
     if (!canChangePassword(data.current, id, data.accounts.find((account) => account.id === id)?.role))
       throw new Error("Você não tem permissão para alterar esta senha.");
-    validateNewPassword(password, confirmation);
-    if (password.length < 6)
-      throw new Error("A nova senha precisa ter pelo menos seis caracteres.");
+    validateNewPassword(password, confirmation, id === data.current?.id ? currentPassword : undefined);
     if (id === data.current?.id) {
       if (!currentPassword) throw new Error("Informe a senha atual.");
       await accessApi.changePassword(requireToken(), currentPassword, password);

@@ -1,3 +1,4 @@
+import { emailValido, telefoneValido, novaSenhaValida, validarEmailUnico } from "../../utils/validators.ts";
 import type { Account, ProfileInput } from "./types";
 
 export function parseBirthDate(value: string): Date | null {
@@ -50,12 +51,14 @@ export function validateContacts(
   phones: string[],
   requireEmail = true,
 ) {
+  const erroQuantidade = validarEmailUnico(emails);
+  if (erroQuantidade) throw new Error(erroQuantidade);
   if (requireEmail && !emails.some((email) => email.trim()))
     throw new Error("Informe pelo menos um e-mail.");
   if (
     emails
       .filter(Boolean)
-      .some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      .some((email) => emailValido(email) !== null)
   ) {
     throw new Error("Confira os endereços de e-mail informados.");
   }
@@ -67,7 +70,7 @@ export function validateContacts(
   if (
     phones
       .filter(Boolean)
-      .some((phone) => !/^\d{10,13}$/.test(phone.replace(/\D/g, "")))
+      .some((phone) => telefoneValido(phone) !== null)
   ) {
     throw new Error("Informe um telefone com DDD válido.");
   }
@@ -99,9 +102,9 @@ export function validateAccount(
   if (!editingId) initialPassword(input.name, input.birthDate);
 }
 
-export function validateNewPassword(password: string, confirmation: string) {
-  if (!password.trim()) throw new Error("Informe a nova senha.");
-  if (password !== confirmation) throw new Error("As senhas não coincidem.");
+export function validateNewPassword(password: string, confirmation: string, currentPassword?: string) {
+  const error = novaSenhaValida(password, confirmation, currentPassword);
+  if (error) throw new Error(error);
 }
 
 export function isStaff(actor: Account | null): boolean {

@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Action, Button, ErrorMessage, colors, Page, Section, styles } from "../components/ui";
+import { Action, ErrorMessage, colors, Page, Section, styles } from "../components/ui";
 import { AdminFooter, EventCards } from "../components/access";
 import { useAccess } from "../features/access/AccessContext";
 import { ageOn, isStaff, isSuperAdmin } from "../features/access/domain";
@@ -10,7 +10,7 @@ import { roleLabels, type RootStackParamList } from "../features/access/types";
 export default function HomeScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, "Home">) {
-  const { current, signOut, athletes, accounts, groups, refresh, refreshing, syncError } = useAccess();
+  const { current, signOut, athletes, accounts, groups, syncError } = useAccess();
   if (!current) return null;
   const admin = isStaff(current);
   const superadmin = isSuperAdmin(current);
@@ -78,7 +78,6 @@ export default function HomeScreen({
         </Pressable>
       </View>
       <ErrorMessage message={syncError} />
-      <Button title={refreshing ? "ATUALIZANDO..." : "ATUALIZAR DADOS"} secondary compact disabled={refreshing} onPress={() => void refresh()} />
       {admin ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {[
