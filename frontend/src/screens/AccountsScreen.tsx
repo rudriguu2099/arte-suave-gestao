@@ -86,8 +86,9 @@ export default function AccountsScreen({
       <ErrorMessage message={error} />
       <View style={{ gap: 10 }}>
         {filtered.map((row) => (
-          <View key={row.key} style={{ opacity: row.active ? 1 : 0.62 }}>
+          <View key={row.key}>
             <Section>
+              <View style={{ gap: 12, opacity: row.active ? 1 : 0.45 }}>
               <View style={[styles.row, { flexWrap: "wrap", gap: 6 }]}>
                 <Text
                   style={[
@@ -125,10 +126,12 @@ export default function AccountsScreen({
                   {row.hasAccess ? "Conta inativa" : "Aluno inativo"}
                 </Text>
               )}
+              </View>
               <View style={styles.wrap}>
                 {canManageProfile(current, row.role) && (
                   <Button
                     title="EDITAR"
+                    disabled={!row.active}
                     compact
                     secondary
                     onPress={() => navigation.navigate("AccountForm", row.target)}
@@ -138,13 +141,14 @@ export default function AccountsScreen({
                   <Button
                     title={row.active ? "INATIVAR" : "ATIVAR"}
                     compact
-                    secondary
+                    secondary={row.active}
                     onPress={() => setPending(row)}
                   />
                 )}
                 {row.hasAccess && row.accountId && canChangePassword(current, row.accountId, row.role) && (
                   <Button
                     title={row.accountId === current?.id ? "ALTERAR MINHA SENHA" : "REDEFINIR SENHA"}
+                    disabled={!row.active}
                     compact
                     secondary
                     onPress={() =>

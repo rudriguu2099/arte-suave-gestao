@@ -1,3 +1,4 @@
+import { LIMITE_SENHA } from "../utils/validators";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -82,7 +83,8 @@ export default function PasswordScreen({
               label="Senha atual *"
               value={currentPassword}
               onChangeText={setCurrentPassword}
-              secureTextEntry={!visible}
+              maxLength={LIMITE_SENHA}
+            secureTextEntry={!visible}
               autoCapitalize="none"
               autoCorrect={false}
               textContentType="password"
@@ -92,6 +94,7 @@ export default function PasswordScreen({
             label="Nova senha *"
             value={password}
             onChangeText={setPassword}
+            maxLength={LIMITE_SENHA}
             secureTextEntry={!visible}
             autoCapitalize="none"
             autoCorrect={false}
@@ -101,11 +104,13 @@ export default function PasswordScreen({
             label="Repita a senha *"
             value={confirmation}
             onChangeText={setConfirmation}
+            maxLength={LIMITE_SENHA}
             secureTextEntry={!visible}
             autoCapitalize="none"
             autoCorrect={false}
             textContentType="newPassword"
           />
+          <Text style={styles.muted}>Use de 6 a 16 caracteres, com maiúscula, minúscula, número e símbolo.</Text>
           <Check label="Mostrar senhas" value={visible} onChange={setVisible} />
           <ErrorMessage message={error} />
           <View

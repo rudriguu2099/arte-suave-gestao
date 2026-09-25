@@ -64,7 +64,7 @@ test("duplicate emails are rejected, including inactive accounts", () => {
   assert.doesNotThrow(() => validateAccount(account, [account], "one"));
   assert.throws(
     () => validateContacts(["a@example.com", "A@example.com"], []),
-    /repetidos/,
+    /apenas um e-mail/,
   );
   assert.throws(() => validateContacts(["invalid"], []), /e-mail/);
 });
@@ -103,7 +103,7 @@ test("new passwords must be nonempty and match", () => {
   assert.throws(() => validateNewPassword("", ""));
   assert.throws(() => validateNewPassword("senha1", "senha2"));
   assert.doesNotThrow(() =>
-    validateNewPassword("MinhaNovaSenha", "MinhaNovaSenha"),
+    validateNewPassword("MinhaNovaSenha1!", "MinhaNovaSenha1!"),
   );
 });
 

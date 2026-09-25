@@ -48,9 +48,7 @@ export default function AccountFormScreen({
   const person = existing ?? student;
   const [name, setName] = useState(person?.name ?? "");
   const [birthDate, setBirthDate] = useState(person?.birthDate ?? "");
-  const [emails, setEmails] = useState(
-    person?.emails.length ? person.emails : [""],
-  );
+  const [email, setEmail] = useState(person?.emails[0] ?? "");
   const [phones, setPhones] = useState(
     person?.phones.length ? person.phones : [""],
   );
@@ -101,7 +99,7 @@ export default function AccountFormScreen({
       const input: ProfileInput = {
         name,
         birthDate,
-        emails,
+        emails: email.trim() ? [email.trim()] : [],
         phones,
         role,
         groupId: role === "athlete" ? groupId : undefined,
@@ -198,8 +196,8 @@ export default function AccountFormScreen({
         />
         <Contacts
           kind="email"
-          values={emails}
-          onChange={setEmails}
+          values={[email]}
+          onChange={(values) => setEmail(values[0] ?? "")}
           required={!minor}
         />
         <Contacts kind="phone" values={phones} onChange={setPhones} />

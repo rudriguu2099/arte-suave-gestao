@@ -5,7 +5,7 @@ import { useAccess } from '../features/access/AccessContext'
 import type { RootStackParamList } from '../routes/types'
 import { useTheme } from '../contexts/ThemeContexts'
 import { styles } from './LoginScreen.styles'
-import { validarObrigatorio, emailValido } from '../utils/validators';
+import { validarObrigatorio, emailValido, LIMITE_SENHA } from '../utils/validators';
 
 type props = NativeStackScreenProps<RootStackParamList, "Login">
 
@@ -91,6 +91,7 @@ export default function LoginScreen() {
             <TextInput
                 style={[styles.input, { backgroundColor: cores.inputFundo, borderColor: campoInvalido === 'senha' ? '#DC2626' : cores.inputBorda, color: cores.texto }]}
                 placeholder="••••••••"
+                maxLength={LIMITE_SENHA}
                 secureTextEntry
                 value={senha}
                 onChangeText={setSenha}
