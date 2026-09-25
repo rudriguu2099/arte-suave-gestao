@@ -1,0 +1,12 @@
+{
+  "name": "arte-suave-gestao",
+  "version": "1.0.0",
+  "description": "Repositório do sistema de gestão. Stack: NestJS (Backend) + React Native / Expo (Frontend).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
