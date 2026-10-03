@@ -6,14 +6,12 @@ import {
   OnApplicationBootstrap,
   UnauthorizedException,
 } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { Prisma, type Student, type User } from '../../generated/prisma/client.js';
+import { PrismaService, pgErrorCode } from '../../prisma/prisma.module.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { generateInitialPassword } from '../../common/utils/password-generator.util.js';
 import { assertCanManage } from '../../common/utils/can-manage.util.js';
-import { User } from '../users/entities/user.entity.js';
-import { Student } from './entities/student.entity.js';
-import { SchoolGroup } from './entities/school-group.entity.js';
 import { ProfileDto, UpdateProfileDto } from './dto/profile.dto.js';
 import { ageOn, birthDateToIso, displayDate } from './access.validation.js';
 import type {
@@ -37,27 +35,29 @@ const uiRoles: Record<Role, ProfileRole> = {
 
 @Injectable()
 export class AccessService implements OnApplicationBootstrap {
-  constructor(private readonly database: DataSource) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async onApplicationBootstrap() {
-    const repository = this.database.getRepository(SchoolGroup);
     // Initial catalog only. Never replace an existing class configuration.
-    if ((await repository.count()) === 0) {
-      await repository.insert([
-        { id: 'adult', name: 'Adulto', schedule: 'Seg/Qua' },
-        { id: 'child', name: 'Infantil iniciante', schedule: 'Seg/Qua/Sex' },
-        { id: 'juvenile', name: 'Juvenil', schedule: 'Ter/Qui' },
-      ]);
+    if ((await this.prisma.schoolGroup.count()) === 0) {
+      await this.prisma.schoolGroup.createMany({
+        data: [
+          { id: 'adult', name: 'Adulto', schedule: 'Seg/Qua' },
+          { id: 'child', name: 'Infantil iniciante', schedule: 'Seg/Qua/Sex' },
+          { id: 'juvenile', name: 'Juvenil', schedule: 'Ter/Qui' },
+        ],
+      });
     }
   }
 
   private accountView(user: User, students: Student[]): AccessAccount {
+    const contactEmails = user.contactEmails as string[];
     return {
       id: user.id,
       name: user.name,
       birthDate: displayDate(user.birthDate),
-      emails: user.contactEmails?.length ? user.contactEmails : [user.email],
-      phones: user.phones ?? [],
+      emails: contactEmails.length ? contactEmails : [user.email],
+      phones: user.phones as string[],
       role: uiRoles[user.role],
       active: user.isActive,
       isSuperAdmin: user.isSuperAdmin === true,
@@ -72,79 +72,81 @@ export class AccessService implements OnApplicationBootstrap {
   }
 
   async me(actorId: string): Promise<AccessAccount> {
-    const user = await this.database.getRepository(User).findOneBy({ id: actorId });
+    const user = await this.prisma.user.findFirst({ where: { id: actorId, deletedAt: null } });
     if (!user?.isActive) throw new UnauthorizedException('Conta indisponível.');
-    const students = await this.database.getRepository(Student).findBy(
-      user.role === Role.RESPONSAVEL ? { guardianId: user.id } : { accountId: user.id },
-    );
+    const students = await this.prisma.student.findMany({
+      where: user.role === Role.RESPONSAVEL ? { guardianId: user.id } : { accountId: user.id },
+    });
     return this.accountView(user, students);
   }
 
   async state(actorId: string): Promise<AccessState> {
-    return this.database.transaction('REPEATABLE READ', async (manager) => {
-      const users = manager.getRepository(User);
-      const current = await users.findOneBy({ id: actorId });
-      if (!current?.isActive)
-        throw new UnauthorizedException('Conta indisponível.');
-      const staff = current.role === Role.ADMINISTRADOR;
-      const students = await manager.getRepository(Student).find({
-        where: staff
-          ? {}
-          : current.role === Role.RESPONSAVEL
-            ? { guardianId: current.id }
-            : { accountId: current.id },
-        order: { name: 'ASC' },
-      });
-      const accounts = staff
-        ? await users.find({ order: { name: 'ASC' } })
-        : [current];
-      const allGroups = await manager
-        .getRepository(SchoolGroup)
-        .find({ order: { name: 'ASC' } });
-      return {
-        current: this.accountView(current, students),
-        accounts: accounts.map((account) =>
-          this.accountView(account, students),
-        ),
-        athletes: students.map((student) => ({
-          id: student.id,
-          name: student.name,
-          birthDate: displayDate(student.birthDate),
-          emails: student.emails,
-          phones: student.phones,
-          groupId: student.groupId,
-          belt: student.belt,
-          attendance: student.attendance,
-          active: student.active,
-          accountId: student.accountId ?? undefined,
-          guardianId: student.guardianId ?? undefined,
-        })),
-        groups: staff
-          ? allGroups
-          : allGroups.filter((group) =>
-              students.some((student) => student.groupId === group.id),
-            ),
-        events: [], // No event service has been delivered in this sprint.
-      };
-    });
+    return this.prisma.$transaction(
+      async (tx) => {
+        const current = await tx.user.findFirst({ where: { id: actorId, deletedAt: null } });
+        if (!current?.isActive)
+          throw new UnauthorizedException('Conta indisponível.');
+        const staff = current.role === Role.ADMINISTRADOR;
+        const students = await tx.student.findMany({
+          where: staff
+            ? {}
+            : current.role === Role.RESPONSAVEL
+              ? { guardianId: current.id }
+              : { accountId: current.id },
+          orderBy: { name: 'asc' },
+        });
+        const accounts = staff
+          ? await tx.user.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } })
+          : [current];
+        const allGroups = await tx.schoolGroup.findMany({ orderBy: { name: 'asc' } });
+        return {
+          current: this.accountView(current, students),
+          accounts: accounts.map((account) =>
+            this.accountView(account, students),
+          ),
+          athletes: students.map((student) => ({
+            id: student.id,
+            name: student.name,
+            birthDate: displayDate(student.birthDate),
+            emails: student.emails as string[],
+            phones: student.phones as string[],
+            groupId: student.groupId,
+            belt: student.belt,
+            attendance: student.attendance as boolean[],
+            active: student.active,
+            accountId: student.accountId ?? undefined,
+            guardianId: student.guardianId ?? undefined,
+          })),
+          groups: staff
+            ? allGroups
+            : allGroups.filter((group) =>
+                students.some((student) => student.groupId === group.id),
+              ),
+          events: [], // No event service has been delivered in this sprint.
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
-  private async lockActor(manager: EntityManager, actorId: string): Promise<User> {
-    const actor = await manager
-      .getRepository(User)
-      .findOne({ where: { id: actorId }, lock: { mode: 'pessimistic_write' } });
+  private async lockActor(tx: Prisma.TransactionClient, actorId: string): Promise<User> {
+    // Prisma não tem lock pessimista na API: SELECT ... FOR UPDATE manual.
+    await tx.$queryRaw`SELECT 1 FROM "users" WHERE "id" = ${actorId}::uuid FOR UPDATE`;
+    const actor = await tx.user.findFirst({ where: { id: actorId, deletedAt: null } });
     if (!actor?.isActive) throw new UnauthorizedException('Conta indisponível.');
     return actor;
   }
 
   private async transaction<T>(
-    work: (manager: EntityManager) => Promise<T>,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await this.database.transaction('SERIALIZABLE', work);
+        return await this.prisma.$transaction(work, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
       } catch (error) {
-        const code = (error as { code?: string }).code;
+        const code = pgErrorCode(error);
         if ((code === '40001' || code === '40P01') && attempt < 2) continue;
         if (code === '23505')
           throw new ConflictException(
@@ -156,20 +158,18 @@ export class AccessService implements OnApplicationBootstrap {
   }
 
   private async loadTarget(
-    manager: EntityManager,
+    db: Prisma.TransactionClient,
     target: ProfileTarget,
   ): Promise<{ account: User | null; student: Student | null }> {
-    const users = manager.getRepository(User);
-    const pupils = manager.getRepository(Student);
     if (target.kind === 'account') {
-      const account = await users.findOneBy({ id: target.id });
+      const account = await db.user.findFirst({ where: { id: target.id, deletedAt: null } });
       if (!account) throw new NotFoundException('Conta não encontrada.');
-      return { account, student: await pupils.findOneBy({ accountId: account.id }) };
+      return { account, student: await db.student.findUnique({ where: { accountId: account.id } }) };
     }
-    const student = await pupils.findOneBy({ id: target.id });
+    const student = await db.student.findUnique({ where: { id: target.id } });
     if (!student) throw new NotFoundException('Aluno não encontrado.');
     const account = student.accountId
-      ? await users.findOneBy({ id: student.accountId })
+      ? await db.user.findFirst({ where: { id: student.accountId, deletedAt: null } })
       : null;
     return { account, student };
   }
@@ -180,15 +180,16 @@ export class AccessService implements OnApplicationBootstrap {
     patch: UpdateProfileDto,
     target: ProfileTarget,
   ): Promise<ProfileResult> {
-    const { account, student } = await this.loadTarget(this.database.manager, target);
+    const { account, student } = await this.loadTarget(this.prisma, target);
+    const contactEmails = account?.contactEmails as string[] | undefined;
     const current: ProfileDto = {
       name: (account ?? student!).name,
       birthDate: displayDate((account ?? student!).birthDate),
       role: account ? uiRoles[account.role] : 'athlete',
       emails: account
-        ? account.contactEmails?.length ? account.contactEmails : [account.email]
-        : student!.emails,
-      phones: account?.phones ?? student!.phones,
+        ? contactEmails?.length ? contactEmails : [account.email]
+        : (student!.emails as string[]),
+      phones: (account?.phones ?? student!.phones) as string[],
       groupId: student?.groupId,
       guardianId: student?.guardianId ?? undefined,
     };
@@ -204,6 +205,7 @@ export class AccessService implements OnApplicationBootstrap {
     target?: ProfileTarget,
   ): Promise<ProfileResult> {
     const birthDate = birthDateToIso(dto.birthDate);
+    const birthDay = new Date(birthDate + 'T00:00:00Z');
     const name = dto.name.trim();
     const emails = dto.emails
       .map((email) => email.trim().toLowerCase())
@@ -220,13 +222,11 @@ export class AccessService implements OnApplicationBootstrap {
         'Informe um e-mail para a conta de acesso.',
       );
 
-    return this.transaction(async (manager) => {
-      const actor = await this.lockActor(manager, actorId);
+    return this.transaction(async (tx) => {
+      const actor = await this.lockActor(tx, actorId);
       assertCanManage(actor, databaseRoles[dto.role]);
-      const users = manager.getRepository(User);
-      const pupils = manager.getRepository(Student);
       let { account, student } = target
-        ? await this.loadTarget(manager, target)
+        ? await this.loadTarget(tx, target)
         : { account: null as User | null, student: null as Student | null };
       assertCanManage(actor, account?.role);
       if (account?.isSuperAdmin && dto.role !== 'admin')
@@ -236,7 +236,7 @@ export class AccessService implements OnApplicationBootstrap {
       if (
         account?.role === Role.RESPONSAVEL &&
         dto.role !== 'responsible' &&
-        (await pupils.countBy({ guardianId: account.id }))
+        (await tx.student.count({ where: { guardianId: account.id } }))
       ) {
         throw new BadRequestException(
           'Reatribua os alunos deste responsável antes de mudar sua função.',
@@ -245,15 +245,13 @@ export class AccessService implements OnApplicationBootstrap {
       if (dto.role === 'athlete') {
         if (
           !dto.groupId ||
-          !(await manager
-            .getRepository(SchoolGroup)
-            .existsBy({ id: dto.groupId }))
+          !(await tx.schoolGroup.count({ where: { id: dto.groupId } }))
         ) {
           throw new BadRequestException('Selecione uma turma válida.');
         }
         if (minor) {
           const guardian = dto.guardianId
-            ? await users.findOneBy({ id: dto.guardianId })
+            ? await tx.user.findFirst({ where: { id: dto.guardianId, deletedAt: null } })
             : null;
           if (!guardian?.isActive || guardian.role !== Role.RESPONSAVEL) {
             throw new BadRequestException(
@@ -265,98 +263,86 @@ export class AccessService implements OnApplicationBootstrap {
       let password: string | undefined;
       let accountId: string | null = account?.id ?? null;
       if (!minor) {
-        const allUsers = await users.find({ withDeleted: true });
+        // Inclui contas excluídas: o e-mail delas continua reservado.
+        const allUsers = await tx.user.findMany();
         if (
           allUsers.some(
             (user) =>
               user.id !== account?.id &&
-              [user.email, ...(user.contactEmails ?? [])].some((email) =>
+              [user.email, ...(user.contactEmails as string[])].some((email) =>
                 emails.includes(email.toLowerCase()),
               ),
           )
         ) {
           throw new ConflictException('Um dos e-mails já está cadastrado.');
         }
-        if (!account) {
-          password = generateInitialPassword(
-            name,
-            new Date(birthDate + 'T00:00:00Z'),
-          );
-          account = users.create({
-            password: await bcrypt.hash(password, 10),
-            isActive: true,
-            isSuperAdmin: false,
-            tokenVersion: 0,
-          });
-        }
         // Only these fields are mutable: a forged superadmin flag is never assigned.
-        Object.assign(account, {
+        const fields = {
           name,
-          birthDate: new Date(birthDate + 'T00:00:00Z'),
+          birthDate: birthDay,
           email: emails[0],
           contactEmails: emails,
           phones,
           role: databaseRoles[dto.role],
-        });
-        account = await users.save(account);
+        };
+        if (!account) {
+          password = generateInitialPassword(name, birthDay);
+          account = await tx.user.create({
+            data: { ...fields, password: await bcrypt.hash(password, 10) },
+          });
+        } else {
+          account = await tx.user.update({ where: { id: account.id }, data: fields });
+        }
         accountId = account.id;
       } else if (account) {
-        account.isActive = false;
-        account.tokenVersion = (account.tokenVersion ?? 0) + 1;
-        await users.save(account);
-        await users.softDelete(account.id);
+        await tx.user.update({
+          where: { id: account.id },
+          data: { isActive: false, tokenVersion: { increment: 1 }, deletedAt: new Date() },
+        });
         accountId = null;
       }
       if (dto.role === 'athlete') {
-        student ??= pupils.create({
-          active: true,
-          belt: 'Branca',
-          attendance: [],
-        });
-        Object.assign(student, {
+        const data = {
           name,
-          birthDate,
+          birthDate: birthDay,
           emails,
           phones,
-          groupId: dto.groupId,
+          groupId: dto.groupId!,
           accountId,
           guardianId: minor ? dto.guardianId : null,
-        });
-        await pupils.save(student);
+        };
+        if (student) await tx.student.update({ where: { id: student.id }, data });
+        else await tx.student.create({ data });
       } else if (student) {
-        Object.assign(student, {
-          name,
-          birthDate,
-          emails,
-          phones,
-          accountId,
-          guardianId: null,
+        await tx.student.update({
+          where: { id: student.id },
+          data: { name, birthDate: birthDay, emails, phones, accountId, guardianId: null },
         });
-        await pupils.save(student);
       }
       return { name, hasAccess: !minor, ...(password ? { password } : {}) };
     });
   }
 
   async toggleActive(actorId: string, target: ProfileTarget): Promise<void> {
-    await this.transaction(async (manager) => {
-      const actor = await this.lockActor(manager, actorId);
+    await this.transaction(async (tx) => {
+      const actor = await this.lockActor(tx, actorId);
       assertCanManage(actor, undefined);
-      const users = manager.getRepository(User);
-      const pupils = manager.getRepository(Student);
-      const { account, student } = await this.loadTarget(manager, target);
+      const { account, student } = await this.loadTarget(tx, target);
       if (account) {
         assertCanManage(actor, account.role);
         if (account.isSuperAdmin)
           throw new BadRequestException(
             'O superadmin não pode ser inativado pela aplicação.',
           );
-        account.isActive = !account.isActive;
-        account.tokenVersion = (account.tokenVersion ?? 0) + 1;
-        await users.save(account);
+        await tx.user.update({
+          where: { id: account.id },
+          data: { isActive: !account.isActive, tokenVersion: { increment: 1 } },
+        });
       } else if (student) {
-        student.active = !student.active;
-        await pupils.save(student);
+        await tx.student.update({
+          where: { id: student.id },
+          data: { active: !student.active },
+        });
       }
     });
   }

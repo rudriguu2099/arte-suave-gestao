@@ -1,5 +1,6 @@
 # compiled output
 /dist
+/src/generated
 /node_modules
 tsconfig.build.tsbuildinfo
 
