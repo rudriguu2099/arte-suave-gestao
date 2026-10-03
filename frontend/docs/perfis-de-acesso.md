@@ -30,9 +30,9 @@ A porta 3001 permite testar sem encerrar a API existente na porta 3000.
 Para Expo Go em aparelho físico, use o IP de rede do computador na URL da API.
 O aparelho e o computador devem conseguir se comunicar na mesma rede.
 
-O esquema usa a configuração de desenvolvimento já existente do TypeORM
-(`synchronize`). Em produção ela permanece desativada; a implantação requer
-migrações revisadas. Não use a configuração de desenvolvimento em produção.
+O esquema do banco é versionado em migrations do Prisma
+(`backend/prisma/migrations`), aplicadas automaticamente quando o backend sobe,
+em desenvolvimento e em produção.
 
 ## Superadmin
 

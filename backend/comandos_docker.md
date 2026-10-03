@@ -64,7 +64,17 @@ docker compose exec backend npm run test
 docker compose exec db psql -U postgres -d arte_suave_gestao
 ```
 
-> Quando o projeto adicionar um ORM com migrations (ex.: TypeORM/Prisma), rode o comando de migration através do `docker compose exec backend ...` acima, para garantir que ele use a mesma rede e variáveis de ambiente do container.
+O banco é gerenciado pelo Prisma (`prisma/schema.prisma`). O container aplica as migrations pendentes ao subir. Para criar uma nova migration depois de alterar o schema:
+
+```bash
+docker compose exec backend npx prisma migrate dev --name descricao_da_mudanca
+```
+
+> Bancos criados antes da troca do TypeORM pelo Prisma: o mais simples é recriar com `docker compose down -v` (isso também renova o volume de `node_modules`). Para manter os dados, alinhe o banco e marque a migration inicial como aplicada:
+>
+> ```bash
+> docker compose exec backend sh -c "npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script > /tmp/align.sql && npx prisma db execute --file /tmp/align.sql && npx prisma migrate resolve --applied 0_init"
+> ```
 
 ## Build de produção
 

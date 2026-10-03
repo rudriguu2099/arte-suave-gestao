@@ -8,7 +8,9 @@ ARG NODE_VERSION=24-alpine
 FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+# postinstall roda `prisma generate`, que precisa do schema.
+COPY package.json package-lock.json prisma.config.ts ./
+COPY prisma ./prisma
 RUN npm ci
 
 # ---------------------------------------------------------------------------
@@ -25,7 +27,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 EXPOSE 3000
-CMD ["npm", "run", "start:dev"]
+# O bind mount esconde o client gerado na imagem: gera de novo (devolvendo os arquivos ao
+# dono da pasta no host, já que o container roda como root) e aplica as migrations.
+CMD ["sh", "-c", "npx prisma generate && chown -R $(stat -c %u:%g /app) src/generated && npx prisma migrate deploy && npm run start:dev"]
 
 # ---------------------------------------------------------------------------
 # build: compile TypeScript to dist using the full (dev) dependency tree
@@ -36,7 +40,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN npx prisma generate && npm run build
 
 # Reinstall with only production dependencies for the final image
 RUN npm ci --omit=dev && npm cache clean --force
@@ -53,9 +57,10 @@ RUN addgroup -S nodejs && adduser -S nestjs -G nodejs
 
 COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
-COPY --chown=nestjs:nodejs package.json ./
+COPY --chown=nestjs:nodejs package.json prisma.config.ts ./
+COPY --chown=nestjs:nodejs prisma ./prisma
 
 USER nestjs
 
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
