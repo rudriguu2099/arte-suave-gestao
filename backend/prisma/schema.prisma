@@ -60,9 +60,16 @@ model Student {
 }
 
 model SchoolGroup {
-  id       String    @id @db.VarChar(80)
+  id       String    @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(80)
   name     String    @db.VarChar
+  // Critério de agrupamento (RF008/RN006): faixa etária e nível técnico.
+  ageRange String    @default("") @db.VarChar
+  level    String    @default("") @db.VarChar
+  // Dias e horários de treino: [{ weekday: 0-6 (0 = domingo), start: 'HH:MM', end: 'HH:MM' }].
+  sessions Json      @default("[]")
+  // Resumo legível de sessions (ex.: 'Seg/Qua 18:00-19:30'), regravado a cada alteração.
   schedule String    @db.VarChar
+  active   Boolean   @default(true)
   students Student[]
 
   @@map("school_groups")

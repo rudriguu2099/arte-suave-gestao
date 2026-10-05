@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
@@ -15,6 +17,7 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -27,7 +30,7 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { AccessService } from './access.service.js';
-import { ProfileDto, UpdateProfileDto } from './dto/profile.dto.js';
+import { GuardianLinkDto, ProfileDto, UpdateProfileDto } from './dto/profile.dto.js';
 import { AccessAccount, AccessState, ProfileResult } from './access.contract.js';
 import type { JwtPayload } from '../auth/auth.service.js';
 
@@ -160,5 +163,42 @@ export class AccessController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.service.toggleActive(request.user.id, { kind: 'athlete', id });
+  }
+
+  @ApiOperation({
+    summary: 'Vincula um atleta menor a um responsável já cadastrado (RF007)',
+    description: 'Substitui o responsável atual, se houver. Não recadastra o atleta.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'id do aluno' })
+  @ApiCreatedResponse({ description: 'Vínculo salvo (sem corpo)' })
+  @ApiBadRequestResponse({ description: 'Atleta maior de idade, ou responsável inexistente/inativo' })
+  @ApiForbiddenResponse({ description: 'Não é administrador' })
+  @ApiNotFoundResponse({ description: 'Aluno não encontrado' })
+  @Post('profiles/athlete/:id/guardian')
+  @Roles(Role.ADMINISTRADOR)
+  linkGuardian(
+    @Req() request: { user: JwtPayload },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: GuardianLinkDto,
+  ) {
+    return this.service.setGuardian(request.user.id, id, dto.guardianId);
+  }
+
+  @ApiOperation({
+    summary: 'Desfaz o vínculo do atleta com o responsável (RF007)',
+    description: 'O atleta menor fica sem responsável até um novo vínculo; editar o perfil dele exige escolher um.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'id do aluno' })
+  @ApiNoContentResponse({ description: 'Vínculo desfeito' })
+  @ApiForbiddenResponse({ description: 'Não é administrador' })
+  @ApiNotFoundResponse({ description: 'Aluno não encontrado' })
+  @Delete('profiles/athlete/:id/guardian')
+  @HttpCode(204)
+  @Roles(Role.ADMINISTRADOR)
+  unlinkGuardian(
+    @Req() request: { user: JwtPayload },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.service.setGuardian(request.user.id, id, null);
   }
 }
