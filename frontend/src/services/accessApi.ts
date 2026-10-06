@@ -3,6 +3,7 @@ import type {
   Account,
   Event,
   Group,
+  GroupInput,
   ProfileInput,
   ProfileResult,
   ProfileState,
@@ -49,6 +50,19 @@ export const accessApi = {
       {},
       token,
     ),
+  saveGroup: (token: string, input: GroupInput, id?: string) => {
+    const body = {
+      ...input,
+      name: input.name.trim(),
+      ageRange: input.ageRange.trim(),
+      level: input.level.trim(),
+    };
+    return id
+      ? api.patch<Group>("/groups/" + encodeURIComponent(id), body, token)
+      : api.post<Group>("/groups", body, token);
+  },
+  toggleGroupActive: (token: string, id: string) =>
+    api.post<void>("/groups/" + encodeURIComponent(id) + "/toggle-active", {}, token),
   changePassword: (
     token: string,
     currentPassword: string,

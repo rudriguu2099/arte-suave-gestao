@@ -50,7 +50,16 @@ export type ProfileResult = {
   hasAccess: boolean;
   password?: string;
 };
-export type Group = { id: string; name: string; schedule: string };
+// weekday segue o backend: 0 = domingo ... 6 = sábado.
+export const weekdayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+export type GroupSession = { weekday: number; start: string; end: string };
+export type GroupInput = {
+  name: string;
+  ageRange: string;
+  level: string;
+  sessions: GroupSession[];
+};
+export type Group = GroupInput & { id: string; schedule: string; active: boolean };
 export type Event = {
   id: string;
   name: string;
@@ -66,6 +75,7 @@ export type RootStackParamList = {
   AccountForm: ProfileTarget | undefined;
   Password: { accountId?: string } | undefined;
   Groups: undefined;
+  GroupForm: { groupId: string } | undefined;
   Finance: undefined;
   Events: undefined;
   Students: undefined;

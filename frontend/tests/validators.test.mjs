@@ -45,3 +45,19 @@ test("profile accepts a single email and multiple phones", () => {
   assert.doesNotThrow(() => validateContacts([], [], false));
   assert.throws(() => validateContacts([], [], true));
 });
+
+test("group validation mirrors backend rules and time mask", async () => {
+  const { validarTurma, formatarHora } = await import("../src/utils/validators.ts");
+  assert.equal(formatarHora("1830"), "18:30");
+  assert.equal(formatarHora("ab18:3099"), "18:30");
+  assert.equal(formatarHora("1"), "1");
+  const turma = { name: "Kids", ageRange: "6-10 anos", level: "Branca", sessions: [{ weekday: 2, start: "18:00", end: "19:30" }] };
+  assert.equal(validarTurma(turma), null);
+  assert.match(validarTurma({ ...turma, name: " K " }), /entre 2 e 80/);
+  assert.match(validarTurma({ ...turma, ageRange: " " }), /faixa etária/);
+  assert.match(validarTurma({ ...turma, level: "" }), /nível/);
+  assert.match(validarTurma({ ...turma, sessions: [] }), /pelo menos um dia/);
+  assert.match(validarTurma({ ...turma, sessions: [{ weekday: 2, start: "18:0", end: "19:30" }] }), /HH:MM/);
+  assert.match(validarTurma({ ...turma, sessions: [{ weekday: 2, start: "24:00", end: "19:30" }] }), /HH:MM/);
+  assert.match(validarTurma({ ...turma, sessions: [{ weekday: 2, start: "19:30", end: "19:30" }] }), /depois do início/);
+});

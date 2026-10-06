@@ -53,3 +53,28 @@ export function validarEmailUnico(emails: string[]): string | null {
   return emails.filter((email) => email.trim()).length > 1
     ? "Informe apenas um e-mail por perfil." : null;
 }
+
+export function formatarHora(valor: string): string {
+  const numeros = valor.replace(/\D/g, "").slice(0, 4);
+  return numeros.length <= 2 ? numeros : numeros.slice(0, 2) + ":" + numeros.slice(2);
+}
+
+// Mesmas regras do GroupDto/GroupsService do backend.
+export function validarTurma(turma: {
+  name: string;
+  ageRange: string;
+  level: string;
+  sessions: { start: string; end: string }[];
+}): string | null {
+  const hora = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const nome = turma.name.trim();
+  if (nome.length < 2 || nome.length > 80) return "O nome da turma deve ter entre 2 e 80 caracteres.";
+  if (!turma.ageRange.trim() || turma.ageRange.trim().length > 80) return "Informe a faixa etária (até 80 caracteres).";
+  if (!turma.level.trim() || turma.level.trim().length > 80) return "Informe o nível técnico (até 80 caracteres).";
+  if (!turma.sessions.length) return "Selecione pelo menos um dia de treino.";
+  if (turma.sessions.some(({ start, end }) => !hora.test(start) || !hora.test(end)))
+    return "Informe os horários no formato HH:MM.";
+  if (turma.sessions.some(({ start, end }) => start >= end))
+    return "O horário de término deve ser depois do início.";
+  return null;
+}
