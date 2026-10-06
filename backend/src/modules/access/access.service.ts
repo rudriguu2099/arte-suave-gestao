@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  OnApplicationBootstrap,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -35,21 +34,8 @@ const uiRoles: Record<Role, ProfileRole> = {
 };
 
 @Injectable()
-export class AccessService implements OnApplicationBootstrap {
+export class AccessService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onApplicationBootstrap() {
-    // Initial catalog only. Never replace an existing class configuration.
-    if ((await this.prisma.schoolGroup.count()) === 0) {
-      await this.prisma.schoolGroup.createMany({
-        data: [
-          { id: 'adult', name: 'Adulto', schedule: 'Seg/Qua' },
-          { id: 'child', name: 'Infantil iniciante', schedule: 'Seg/Qua/Sex' },
-          { id: 'juvenile', name: 'Juvenil', schedule: 'Ter/Qui' },
-        ],
-      });
-    }
-  }
 
   private accountView(user: User, students: Student[]): AccessAccount {
     const contactEmails = user.contactEmails as string[];
