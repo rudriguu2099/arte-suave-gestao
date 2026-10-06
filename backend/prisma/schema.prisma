@@ -1,11 +1,61 @@
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "esm"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+  moduleFormat    = "esm"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model User {
+  id            String    @id(map: "PK_a3ffb1c0c8416b9fc6f907b7433") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name          String    @db.VarChar
+  email         String    @unique(map: "UQ_97672ac88f789774dd47f7c8be3") @db.VarChar
+  password      String    @db.VarChar
+  birthDate     DateTime  @db.Date
+  role          Role
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @db.Timestamp(6)
+  deletedAt     DateTime? @db.Timestamp(6)
+  isSuperAdmin  Boolean   @unique(map: "UQ_users_single_superadmin", where: raw("(\"isSuperAdmin\" = true)")) @default(false)
+  tokenVersion  Int       @default(0)
+  contactEmails Json      @default("[]")
+  phones        Json      @default("[]")
+  wards         Student[] @relation("StudentGuardian")
+  student       Student?  @relation("StudentAccount")
+
+  @@map("users")
+}
+
+model Student {
+  id         String      @id(map: "PK_7d7f07271ad4ce999880713f05e") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name       String      @db.VarChar
+  birthDate  DateTime    @db.Date
+  emails     Json        @default("[]")
+  phones     Json        @default("[]")
+  groupId    String      @db.VarChar
+  belt       String      @default("Branca") @db.VarChar
+  attendance Json        @default("[]")
+  active     Boolean     @default(true)
+  accountId  String?     @unique(map: "UQ_9aade3cfe3e20d001e056d11b84") @db.Uuid
+  guardianId String?     @db.Uuid
+  guardian   User?       @relation("StudentGuardian", fields: [guardianId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_22b7328b0b586a40dbe658895d3")
+  account    User?       @relation("StudentAccount", fields: [accountId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_9aade3cfe3e20d001e056d11b84")
+  group      SchoolGroup @relation(fields: [groupId], references: [id], onUpdate: NoAction, map: "FK_cc296de36cadf8de53b9cd60aa7")
+
+  @@map("students")
+}
+
+model SchoolGroup {
+  id       String    @id(map: "PK_eb698a65f6acfb76e11306a57e2") @db.VarChar(80)
+  name     String    @db.VarChar
+  schedule String    @db.VarChar
+  students Student[]
+
+  @@map("school_groups")
 }
 
 enum Role {
@@ -14,56 +64,4 @@ enum Role {
   ATLETA_MAIOR
 
   @@map("users_role_enum")
-}
-
-model User {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String    @db.VarChar
-  email         String    @unique @db.VarChar
-  password      String    @db.VarChar
-  birthDate     DateTime  @db.Date
-  role          Role
-  isActive      Boolean   @default(true)
-  isSuperAdmin  Boolean   @default(false)
-  tokenVersion  Int       @default(0)
-  contactEmails Json      @default("[]")
-  phones        Json      @default("[]")
-  createdAt     DateTime  @default(now()) @db.Timestamp(6)
-  updatedAt     DateTime  @default(now()) @updatedAt @db.Timestamp(6)
-  // Soft delete: toda consulta de conta ativa precisa filtrar deletedAt: null.
-  deletedAt     DateTime? @db.Timestamp(6)
-
-  student Student?  @relation("StudentAccount")
-  wards   Student[] @relation("StudentGuardian")
-
-  @@map("users")
-}
-
-model Student {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name       String   @db.VarChar
-  birthDate  DateTime @db.Date
-  emails     Json     @default("[]")
-  phones     Json     @default("[]")
-  groupId    String   @db.VarChar(80)
-  belt       String   @default("Branca") @db.VarChar
-  attendance Json     @default("[]")
-  active     Boolean  @default(true)
-  accountId  String?  @unique @db.Uuid
-  guardianId String?  @db.Uuid
-
-  group    SchoolGroup @relation(fields: [groupId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  account  User?       @relation("StudentAccount", fields: [accountId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  guardian User?       @relation("StudentGuardian", fields: [guardianId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-
-  @@map("students")
-}
-
-model SchoolGroup {
-  id       String    @id @db.VarChar(80)
-  name     String    @db.VarChar
-  schedule String    @db.VarChar
-  students Student[]
-
-  @@map("school_groups")
 }

@@ -4,6 +4,8 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import configuration from './config/configuration.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { StudentsModule } from './modules/students/students.module.js';
+import { SchoolGroupsModule } from './modules/school-groups/school-groups.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { AccessModule } from './modules/access/access.module.js';
@@ -19,6 +21,8 @@ import { AccessModule } from './modules/access/access.module.js';
     UsersModule,
     AuthModule,
     AccessModule,
+    StudentsModule,
+    SchoolGroupsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
