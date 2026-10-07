@@ -28,11 +28,11 @@ export class ProfileDto {
 
   @ApiProperty({
     type: [String],
-    maxItems: 10,
+    maxItems: 1,
     example: ['rodrigo@example.com'],
     description: 'O primeiro vira o login. Obrigatório, exceto para atleta menor de idade.',
   })
-  @IsArray() @ArrayMaxSize(10) @IsEmail({}, { each: true }) emails: string[];
+  @IsArray() @ArrayMaxSize(1) @IsEmail({}, { each: true }) emails: string[];
 
   @ApiProperty({ type: [String], maxItems: 10, example: ['88999990000'], description: 'Com DDD, 10 a 13 dígitos' })
   @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) phones: string[];

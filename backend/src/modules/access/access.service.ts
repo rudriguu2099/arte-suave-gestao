@@ -200,6 +200,8 @@ export class AccessService {
       .filter(Boolean);
     const phones = dto.phones.map((phone) => phone.trim()).filter(Boolean);
     if (!name) throw new BadRequestException('Informe o nome.');
+    if (emails.length > 1)
+      throw new BadRequestException('Informe apenas um e-mail.');
     if (new Set(emails).size !== emails.length)
       throw new BadRequestException('E-mails repetidos.');
     if (phones.some((phone) => !/^\d{10,13}$/.test(phone.replace(/\D/g, ''))))
