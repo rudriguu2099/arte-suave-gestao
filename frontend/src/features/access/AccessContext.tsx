@@ -12,10 +12,12 @@ import { accessApi, type AccessState } from "../../services/accessApi";
 import { ApiError } from "../../services/api";
 import { canChangePassword, requireManageProfile, validateNewPassword, validateContacts, ageOn } from "./domain";
 import { findProfile } from "./profiles";
+import { validarTurma } from "../../utils/validators";
 import type {
   Account,
   Event,
   Group,
+  GroupInput,
   ProfileInput,
   ProfileResult,
   ProfileState,
@@ -37,6 +39,8 @@ type AccessValue = ProfileState & {
     target?: ProfileTarget,
   ) => Promise<ProfileResult>;
   toggleActive: (target: ProfileTarget) => Promise<void>;
+  saveGroup: (input: GroupInput, id?: string) => Promise<void>;
+  toggleGroupActive: (id: string) => Promise<void>;
   changePassword: (
     id: string,
     password: string,
@@ -127,6 +131,16 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     await accessApi.toggleActive(requireToken(), target);
     await refresh();
   }
+  async function saveGroup(input: GroupInput, id?: string) {
+    const erro = validarTurma(input);
+    if (erro) throw new Error(erro);
+    await accessApi.saveGroup(requireToken(), input, id);
+    await refresh();
+  }
+  async function toggleGroupActive(id: string) {
+    await accessApi.toggleGroupActive(requireToken(), id);
+    await refresh();
+  }
   async function changePassword(
     id: string,
     password: string,
@@ -159,6 +173,8 @@ export function AccessProvider({ children }: { children: ReactNode }) {
         refresh,
         saveProfile,
         toggleActive,
+        saveGroup,
+        toggleGroupActive,
         changePassword,
       }}
     >

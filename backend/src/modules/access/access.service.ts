@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  OnApplicationBootstrap,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -16,6 +15,7 @@ import { ProfileDto, UpdateProfileDto } from './dto/profile.dto.js';
 import { ageOn, birthDateToIso, displayDate } from './access.validation.js';
 import type {
   AccessAccount,
+  AccessGroup,
   AccessState,
   ProfileResult,
   ProfileRole,
@@ -34,21 +34,8 @@ const uiRoles: Record<Role, ProfileRole> = {
 };
 
 @Injectable()
-export class AccessService implements OnApplicationBootstrap {
+export class AccessService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onApplicationBootstrap() {
-    // Initial catalog only. Never replace an existing class configuration.
-    if ((await this.prisma.schoolGroup.count()) === 0) {
-      await this.prisma.schoolGroup.createMany({
-        data: [
-          { id: 'adult', name: 'Adulto', schedule: 'Seg/Qua' },
-          { id: 'child', name: 'Infantil iniciante', schedule: 'Seg/Qua/Sex' },
-          { id: 'juvenile', name: 'Juvenil', schedule: 'Ter/Qui' },
-        ],
-      });
-    }
-  }
 
   private accountView(user: User, students: Student[]): AccessAccount {
     const contactEmails = user.contactEmails as string[];
@@ -98,7 +85,8 @@ export class AccessService implements OnApplicationBootstrap {
         const accounts = staff
           ? await tx.user.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } })
           : [current];
-        const allGroups = await tx.schoolGroup.findMany({ orderBy: { name: 'asc' } });
+        // sessions é Json no Prisma; o formato é garantido pelo GroupsService.
+        const allGroups = (await tx.schoolGroup.findMany({ orderBy: { name: 'asc' } })) as unknown as AccessGroup[];
         return {
           current: this.accountView(current, students),
           accounts: accounts.map((account) =>
@@ -243,9 +231,11 @@ export class AccessService implements OnApplicationBootstrap {
         );
       }
       if (dto.role === 'athlete') {
+        // Turma inativa não recebe alunos novos; quem já está nela pode ser editado sem trocar de turma.
+        const groupFilter = dto.groupId === student?.groupId ? {} : { active: true };
         if (
           !dto.groupId ||
-          !(await tx.schoolGroup.count({ where: { id: dto.groupId } }))
+          !(await tx.schoolGroup.count({ where: { id: dto.groupId, ...groupFilter } }))
         ) {
           throw new BadRequestException('Selecione uma turma válida.');
         }
@@ -320,6 +310,24 @@ export class AccessService implements OnApplicationBootstrap {
         });
       }
       return { name, hasAccess: !minor, ...(password ? { password } : {}) };
+    });
+  }
+
+  // HU010/RF007: vincula o atleta menor a um responsável já cadastrado (guardianId) ou desfaz o vínculo (null).
+  async setGuardian(actorId: string, studentId: string, guardianId: string | null): Promise<void> {
+    await this.transaction(async (tx) => {
+      const actor = await this.lockActor(tx, actorId);
+      assertCanManage(actor, Role.RESPONSAVEL);
+      const student = await tx.student.findUnique({ where: { id: studentId } });
+      if (!student) throw new NotFoundException('Aluno não encontrado.');
+      if (guardianId) {
+        if (student.accountId || ageOn(student.birthDate.toISOString().slice(0, 10)) >= 18)
+          throw new BadRequestException('Somente atleta menor de idade é vinculado a um responsável.');
+        const guardian = await tx.user.findFirst({ where: { id: guardianId, deletedAt: null } });
+        if (!guardian?.isActive || guardian.role !== Role.RESPONSAVEL)
+          throw new BadRequestException('Selecione um responsável ativo já cadastrado.');
+      }
+      await tx.student.update({ where: { id: student.id }, data: { guardianId } });
     });
   }
 

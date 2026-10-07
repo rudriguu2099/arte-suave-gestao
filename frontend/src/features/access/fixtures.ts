@@ -1,9 +1,9 @@
 import type { Account, Athlete, Event, Group } from "./types";
 
 export const groups: Group[] = [
-  { id: "adult", name: "Adulto", schedule: "Seg/Qua" },
-  { id: "child", name: "Infantil iniciante", schedule: "Seg/Qua/Sex" },
-  { id: "juvenile", name: "Juvenil", schedule: "Ter/Qui" },
+  { id: "adult", name: "Adulto", schedule: "Seg/Qua", ageRange: "", level: "", sessions: [], active: true },
+  { id: "child", name: "Infantil iniciante", schedule: "Seg/Qua/Sex", ageRange: "", level: "", sessions: [], active: true },
+  { id: "juvenile", name: "Juvenil", schedule: "Ter/Qui", ageRange: "", level: "", sessions: [], active: true },
 ];
 export const events: Event[] = [
   {

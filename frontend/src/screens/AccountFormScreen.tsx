@@ -207,7 +207,8 @@ export default function AccountFormScreen({
           <Select
             label="Turma *"
             value={groupId}
-            options={groups.map((group) => ({
+            // Turma inativa não recebe alunos novos; quem já está nela continua podendo ser editado.
+            options={groups.filter((group) => group.active || group.id === student?.groupId).map((group) => ({
               value: group.id,
               label: group.name + " · " + group.schedule,
             }))}

@@ -46,3 +46,8 @@ export class ProfileDto {
 
 // PATCH: só o que mudar; o resto é completado com os dados atuais.
 export class UpdateProfileDto extends PartialType(ProfileDto) {}
+
+export class GuardianLinkDto {
+  @ApiProperty({ format: 'uuid', description: 'Responsável ativo já cadastrado' })
+  @IsUUID() guardianId: string;
+}

@@ -14,31 +14,6 @@ import { useAccess } from "../features/access/AccessContext";
 import { ageOn, isStaff, isSuperAdmin } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
 
-export function GroupsScreen({
-  navigation,
-}: NativeStackScreenProps<RootStackParamList, "Groups">) {
-  const { groups, athletes, current } = useAccess();
-  if (!isStaff(current)) return null;
-  return (
-    <Page footer={<AdminFooter navigation={navigation} active="Groups" />}>
-      <Heading title="TURMAS" subtitle="Turmas disponíveis para vínculo." />
-      {groups.map((group) => (
-        <Section key={group.id}>
-          <Text style={[styles.text, { fontWeight: "700" }]}>{group.name}</Text>
-          <Text style={styles.muted}>{group.schedule}</Text>
-          <Text style={styles.muted}>
-            {
-              athletes.filter(
-                (athlete) => athlete.groupId === group.id && athlete.active,
-              ).length
-            }{" "}
-            atletas ativos
-          </Text>
-        </Section>
-      ))}
-    </Page>
-  );
-}
 export function FinanceScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, "Finance">) {

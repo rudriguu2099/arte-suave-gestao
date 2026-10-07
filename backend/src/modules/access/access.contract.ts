@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { GroupSessionDto } from '../groups/dto/group.dto.js';
 
 export type ProfileRole = 'admin' | 'responsible' | 'athlete';
 export const profileRoles: ProfileRole[] = ['admin', 'responsible', 'athlete'];
@@ -39,7 +40,13 @@ export class AccessStudent {
 export class AccessGroup {
   @ApiProperty({ example: 'adult' }) id: string;
   @ApiProperty({ example: 'Adulto' }) name: string;
-  @ApiProperty({ example: 'Seg/Qua' }) schedule: string;
+  @ApiProperty({ example: '18 anos ou mais', description: 'Faixa etária' }) ageRange: string;
+  @ApiProperty({ example: 'Iniciante', description: 'Nível técnico' }) level: string;
+  @ApiProperty({ type: [GroupSessionDto], description: 'Dias e horários de treino, ordenados' })
+  sessions: GroupSessionDto[];
+  @ApiProperty({ example: 'Seg/Qua 18:00-19:30', description: 'Resumo de sessions para exibição' })
+  schedule: string;
+  @ApiProperty() active: boolean;
 }
 
 export class AccessEvent {

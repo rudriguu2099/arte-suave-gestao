@@ -5,7 +5,8 @@ import LoginScreen from "../screens/LoginScreen";
 import AccountsScreen from "../screens/AccountsScreen";
 import AccountFormScreen from "../screens/AccountFormScreen";
 import PasswordScreen from "../screens/PasswordScreen";
-import { EventsScreen, FinanceScreen, GroupsScreen, StudentsScreen, AttendanceScreen } from "../screens/ReferenceScreens";
+import { EventsScreen, FinanceScreen, StudentsScreen, AttendanceScreen } from "../screens/ReferenceScreens";
+import { GroupFormScreen, GroupsScreen } from "../screens/GroupsScreen";
 import { useAccess } from "../features/access/AccessContext";
 import { isStaff, isSuperAdmin } from "../features/access/domain";
 import type { RootStackParamList } from "./types";
@@ -23,6 +24,7 @@ export default function Routes() {
           <Stack.Screen name="Accounts" component={AccountsScreen} />
           <Stack.Screen name="AccountForm" component={AccountFormScreen} />
           <Stack.Screen name="Groups" component={GroupsScreen} />
+          <Stack.Screen name="GroupForm" component={GroupFormScreen} />
           <Stack.Screen name="Students" component={StudentsScreen} />
           <Stack.Screen name="Attendance" component={AttendanceScreen} />
         </>}
