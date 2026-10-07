@@ -31,6 +31,7 @@ type AccessValue = ProfileState & {
   syncError: string;
   refreshing: boolean;
   sessionMessage: string;
+  getToken: () => string;
   login: (email: string, password: string) => Promise<void>;
   signOut: () => void;
   refresh: () => Promise<void>;
@@ -170,6 +171,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
         sessionMessage,
         login,
         signOut,
+        getToken: requireToken,
         refresh,
         saveProfile,
         toggleActive,
