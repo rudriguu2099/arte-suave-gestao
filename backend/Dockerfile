@@ -29,8 +29,7 @@ COPY . .
 EXPOSE 3000
 # O bind mount esconde o client gerado na imagem: gera de novo (devolvendo os arquivos ao
 # dono da pasta no host, já que o container roda como root) e aplica as migrations.
-CMD ["sh", "-c", "npx prisma generate && chown -R $(stat -c %u:%g /app) src/generated && npx prisma migrate deploy && npm run start:dev"]
-
+CMD ["sh", "-c", "./node_modules/.bin/prisma generate && chown -R $(stat -c %u:%g /app) src/generated && ./node_modules/.bin/prisma migrate deploy && npm run start:dev"]
 # ---------------------------------------------------------------------------
 # build: compile TypeScript to dist using the full (dev) dependency tree
 # ---------------------------------------------------------------------------
@@ -40,8 +39,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate && npm run build
-
+RUN ./node_modules/.bin/prisma generate && npm run build
 # Reinstall with only production dependencies for the final image
 RUN npm ci --omit=dev && npm cache clean --force
 
@@ -63,4 +61,4 @@ COPY --chown=nestjs:nodejs prisma ./prisma
 USER nestjs
 
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/main.js"]
