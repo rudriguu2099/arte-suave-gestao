@@ -78,6 +78,6 @@ export type RootStackParamList = {
   GroupForm: { groupId: string } | undefined;
   Finance: undefined;
   Events: undefined;
-  Students: undefined;
+  Students: { groupId?: string } | undefined;
   Attendance: undefined;
 };

@@ -1,4 +1,3 @@
-// src/services/students.ts
 import { api } from "./api";
 
 export type Student = {
@@ -8,7 +7,7 @@ export type Student = {
   absenceCount: number;
   birthDate: string;
   group?: { id: string; name: string };
-  guardianName?: string;
+  guardian?: { name: string } | null;
 };
 
 type Filters = { groupId?: string; search?: string; active?: boolean };

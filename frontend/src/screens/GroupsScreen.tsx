@@ -82,7 +82,10 @@ export function GroupsScreen({
         {groups.map((group) => (
           <Section key={group.id}>
             <View style={[styles.row, { alignItems: "flex-start" }]}>
-              <View style={{ flex: 1, gap: 6, opacity: group.active ? 1 : 0.45 }}>
+                <Pressable
+                  style={{ flex: 1, gap: 6, opacity: group.active ? 1 : 0.45 }}
+                  onPress={() => navigation.navigate("Students", { groupId: group.id })}
+                >                
                 <Text style={[styles.text, { fontWeight: "700", fontSize: 16 }]}>
                   {group.name}
                 </Text>
@@ -106,7 +109,7 @@ export function GroupsScreen({
                   <Text style={styles.muted}>{group.schedule}</Text>
                 )}
                 {!group.active && <Text style={styles.label}>Turma inativa</Text>}
-              </View>
+                </Pressable>
               <View style={{ gap: 8 }}>
                 <Button
                   title="EDITAR"

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RouteProp } from "@react-navigation/native";
 
 import {
   Page,
@@ -15,13 +16,13 @@ import {
 
 import { AdminFooter } from "../components/access";
 import { useAccess } from "../features/access/AccessContext";
-import { ageOn } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
 import { ApiError } from "../services/api";
 import { getStudents, type Student } from "../services/students";
 
 type AtletasScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Students">;
+  route: RouteProp<RootStackParamList, "Students">;
 };
 
 const statusOptions = [
@@ -33,20 +34,30 @@ const statusOptions = [
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" });
 
-const isMinor = (birthDate: string) => {
-  const age = ageOn(birthDate);
+const isMinor = (athlete: Student) => {
+  if (athlete.guardian) return true;
+
+  const birth = new Date(athlete.birthDate);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+
   return age >= 0 && age < 18;
 };
 
-export default function AtletasScreen({ navigation }: AtletasScreenProps) {
+export default function AtletasScreen({ navigation, route }: AtletasScreenProps) {
   const { groups, getToken, signOut } = useAccess();
+
+  const lockedGroupId = route.params?.groupId;
+  const lockedGroup = groups.find((g) => g.id === lockedGroupId);
 
   const [athletes, setAthletes] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
-  const [groupId, setGroupId] = useState("");
+  const [groupId, setGroupId] = useState(route.params?.groupId ?? "");
   const [active, setActive] = useState("");
 
   const groupOptions = useMemo(
@@ -94,9 +105,9 @@ export default function AtletasScreen({ navigation }: AtletasScreenProps) {
     >
       <Back onPress={() => navigation.goBack()} />
 
-      <Heading title="ATLETAS" subtitle="Cadastro, busca e filtros" />
+      <Heading title="ATLETAS" subtitle={lockedGroup ? lockedGroup.name : "Cadastro, busca e filtros"} />
 
-      {/* Área de Filtros (HU014) */}
+      {/* Área de Filtros */}
       <View style={{ marginTop: 16, gap: 12 }}>
         <Field
           label=""
@@ -106,15 +117,17 @@ export default function AtletasScreen({ navigation }: AtletasScreenProps) {
         />
 
         <View style={globalStyles.row}>
-          <View style={{ flex: 2 }}>
-            <Select
-              label=""
-              placeholder="Todas as turmas"
-              value={groupId}
-              options={groupOptions}
-              onChange={setGroupId}
-            />
-          </View>
+          {!lockedGroupId && (
+            <View style={{ flex: 2 }}>
+              <Select
+                label=""
+                placeholder="Todas as turmas"
+                value={groupId}
+                options={groupOptions}
+                onChange={setGroupId}
+              />
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Select
               label=""
@@ -162,7 +175,7 @@ export default function AtletasScreen({ navigation }: AtletasScreenProps) {
 
                     <View style={styles.tagDark}>
                       <Text style={styles.tagTextLight}>
-                        {isMinor(athlete.birthDate) ? "MENOR" : "ADULTO"}
+                        {isMinor(athlete) ? "MENOR" : "ADULTO"}
                       </Text>
                     </View>
 
@@ -175,7 +188,7 @@ export default function AtletasScreen({ navigation }: AtletasScreenProps) {
 
                   <Text style={[globalStyles.muted, { marginTop: 4, fontSize: 11 }]}>
                     {athlete.group?.name ?? "Sem turma"} - {formatDate(athlete.birthDate)}
-                    {athlete.guardianName ? ` - Resp: ${athlete.guardianName}` : ""}
+                    {athlete.guardian?.name ? ` - Resp: ${athlete.guardian.name}` : ""}
                   </Text>
                 </View>
 
@@ -204,7 +217,12 @@ export default function AtletasScreen({ navigation }: AtletasScreenProps) {
                   marginTop: 12,
                 }}
               >
-                <Button compact secondary title="Editar" onPress={() => console.log("Editar", athlete.id)} />
+                <Button
+                  compact
+                  secondary
+                  title="Editar"
+                  onPress={() => navigation.navigate("AccountForm", { athleteId: athlete.id })}
+                />
                 <Button compact secondary title="FREQ." onPress={() => console.log("Frequência", athlete.id)} />
               </View>
             </View>

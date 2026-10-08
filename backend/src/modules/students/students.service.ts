@@ -25,12 +25,14 @@ export class StudentsService {
       groupId?: string;
       active?: boolean;
       name?: { contains: string; mode: 'insensitive' };
+      OR?: Array<{ accountId: null } | { account: { role: 'ATLETA_MAIOR' } }>;
     } = {};
 
     if (query.groupId) where.groupId = query.groupId;
     if (typeof query.active === 'boolean') where.active = query.active;
     if (query.search) where.name = { contains: query.search, mode: 'insensitive' };
-
+    where.OR = [{ accountId: null }, { account: { role: 'ATLETA_MAIOR' } }];
+    
     const students = await this.prisma.student.findMany({
       where,
       orderBy: { name: 'asc' },
@@ -43,6 +45,8 @@ export class StudentsService {
         groupId: true,
         attendance: true,
         group: { select: { id: true, name: true } },
+        guardianId: true,
+        guardian: { select: { name: true } },
       },
     });
 
@@ -54,6 +58,8 @@ export class StudentsService {
       active: student.active,
       groupId: student.groupId,
       group: student.group,
+      guardianId: student.guardianId,
+      guardian: student.guardian,
       absenceCount: this.countAbsences(student.attendance),
     }));
   }
