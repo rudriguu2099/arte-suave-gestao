@@ -105,7 +105,7 @@ export default function AtletasScreen({ navigation, route }: AtletasScreenProps)
     >
       <Back onPress={() => navigation.goBack()} />
 
-      <Heading title="ATLETAS" subtitle={lockedGroup ? lockedGroup.name : "Cadastro, busca e filtros"} />
+      <Heading title="ATLETAS" subtitle={lockedGroup ? lockedGroup.name : "Visualização, busca e filtros"} />
 
       {/* Área de Filtros */}
       <View style={{ marginTop: 16, gap: 12 }}>
