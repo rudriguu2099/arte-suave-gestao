@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -15,7 +15,7 @@ import {
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard.js';
 import { FinanceService } from './finance.service.js';
-import { ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto } from './dto/finance.dto.js';
+import { CostAidQueryDto, ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto } from './dto/finance.dto.js';
 
 // Valores saem como number e datas como DD/MM/AAAA.
 @ApiTags('finance')
@@ -27,6 +27,13 @@ import { ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto } from './dt
 export class FinanceController {
   constructor(private readonly service: FinanceService) {}
 
+  @ApiOperation({ summary: 'Relação mensal de ajuda de custo por atleta (HU017 / RF014)' })
+  @ApiOkResponse({ description: 'Atletas ativos divididos em contributed e pending no mês/ano de referência' })
+  @Get('cost-aid')
+  listCostAid(@Query() query: CostAidQueryDto) {
+    return this.service.listCostAid(query);
+  }
+
   @ApiOperation({ summary: 'Lista as receitas, mais recentes primeiro (RF012)' })
   @ApiOkResponse({ description: 'Receitas com o atleta vinculado (id e nome), quando houver' })
   @Get('revenues')
@@ -35,8 +42,8 @@ export class FinanceController {
   }
 
   @ApiOperation({
-    summary: 'Registra uma receita (HU015 / RF012)',
-    description: 'title é obrigatório em OUTROS. studentId só é gravado em AJUDA_DE_CUSTO.',
+    summary: 'Registra uma receita (HU015 / HU018 / RF012)',
+    description: 'title é obrigatório em OUTROS. donor é obrigatório em PATROCINIO_DOACAO. studentId é gravado em AJUDA_DE_CUSTO e PATROCINIO_DOACAO.',
   })
   @ApiCreatedResponse({ description: 'Receita registrada' })
   @ApiBadRequestResponse({ description: 'Dados inválidos: categoria, valor, data, forma de recebimento ou título ausente em OUTROS' })

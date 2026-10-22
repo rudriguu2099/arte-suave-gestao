@@ -34,20 +34,24 @@ const kinds = [
   { kind: "expense", label: "DESPESA", color: "#D80000" },
 ] as const;
 
-// HU015 (receita) e HU016 (despesa).
+// HU015 (receita), HU016 (despesa) e HU018 (doação/patrocínio).
 export default function FinanceEntryScreen({
   navigation,
+  route,
 }: NativeStackScreenProps<RootStackParamList, "FinanceEntry">) {
   const { current, athletes, getToken, signOut } = useAccess();
   const [kind, setKind] = useState<Kind>("revenue");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(route.params?.category ?? "");
   const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState("");
+  const [donor, setDonor] = useState("");
+  const [destination, setDestination] = useState("");
+  const [beneficiary, setBeneficiary] = useState("");
+  const [amount, setAmount] = useState(route.params?.amount ?? "");
+  const [date, setDate] = useState(route.params?.date ?? "");
   const [description, setDescription] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [status, setStatus] = useState("");
-  const [studentId, setStudentId] = useState("");
+  const [studentId, setStudentId] = useState(route.params?.studentId ?? "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -55,6 +59,11 @@ export default function FinanceEntryScreen({
   if (!isSuperAdmin(current)) return null;
 
   const revenue = kind === "revenue";
+  const activeAthletes = athletes
+    .filter((athlete) => athlete.active)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((athlete) => ({ value: athlete.id, label: athlete.name }));
+  const destinationOptions = [...activeAthletes, { value: "OUTROS", label: "Outros" }];
   function changeKind(next: Kind) {
     // As categorias de receita e despesa são diferentes; OUTROS existe nas duas.
     if (category !== "OUTROS") setCategory("");
@@ -66,6 +75,10 @@ export default function FinanceEntryScreen({
     const invalid = validarLancamento({
       categoria: category,
       titulo: title,
+      atleta: studentId,
+      doador: donor,
+      destino: destination,
+      beneficiado: beneficiary,
       valor: amount,
       data: date,
       extra: revenue ? paymentMethod : status,
@@ -87,7 +100,15 @@ export default function FinanceEntryScreen({
         await financeApi.createRevenue(getToken(), {
           ...entry,
           paymentMethod,
-          studentId: category === "AJUDA_DE_CUSTO" && studentId ? studentId : undefined,
+          donor: category === "PATROCINIO_DOACAO" ? donor.trim() : undefined,
+          beneficiary:
+            category === "PATROCINIO_DOACAO" && destination === "OUTROS" ? beneficiary.trim() : undefined,
+          studentId:
+            category === "AJUDA_DE_CUSTO"
+              ? studentId
+              : category === "PATROCINIO_DOACAO" && destination !== "OUTROS"
+                ? destination
+                : undefined,
         });
       else await financeApi.createExpense(getToken(), { ...entry, status });
       setDone(true);
@@ -173,18 +194,28 @@ export default function FinanceEntryScreen({
           <Select label="Situação *" value={status} onChange={setStatus} options={expenseStatuses} />
         )}
         {revenue && category === "AJUDA_DE_CUSTO" && (
-          <Select
-            label="Atleta"
-            value={studentId}
-            onChange={setStudentId}
-            options={[
-              { value: "", label: "Nenhum" },
-              ...athletes
-                .filter((athlete) => athlete.active)
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((athlete) => ({ value: athlete.id, label: athlete.name })),
-            ]}
-          />
+          <Select label="Atleta *" value={studentId} onChange={setStudentId} options={activeAthletes} />
+        )}
+        {revenue && category === "PATROCINIO_DOACAO" && (
+          <>
+            <Field
+              label="Doador / Patrocinador *"
+              placeholder="Nome ou empresa"
+              maxLength={80}
+              value={donor}
+              onChangeText={setDonor}
+            />
+            <Select label="Destino *" value={destination} onChange={setDestination} options={destinationOptions} />
+            {destination === "OUTROS" && (
+              <Field
+                label="Beneficiado *"
+                placeholder="Informe o beneficiado"
+                maxLength={80}
+                value={beneficiary}
+                onChangeText={setBeneficiary}
+              />
+            )}
+          </>
         )}
       </Section>
       <ErrorMessage message={error} />

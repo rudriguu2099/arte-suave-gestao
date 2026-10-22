@@ -64,11 +64,13 @@ model SchoolGroup {
   @@map("school_groups")
 }
 
-// RF012: title só em OUTROS; studentId só em AJUDA_DE_CUSTO (controle mensal do RF014).
+// RF012 / HU018: title só em OUTROS; donor e beneficiary só em PATROCINIO_DOACAO; studentId em AJUDA_DE_CUSTO e PATROCINIO_DOACAO.
 model Revenue {
   id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   category      RevenueCategory
   title         String?         @db.VarChar(80)
+  donor         String?         @db.VarChar(80)
+  beneficiary   String?         @db.VarChar(80)
   amount        Decimal         @db.Decimal(10, 2)
   date          DateTime        @db.Date
   paymentMethod PaymentMethod

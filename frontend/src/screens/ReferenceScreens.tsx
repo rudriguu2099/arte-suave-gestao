@@ -23,7 +23,14 @@ export function FinanceScreen({
   return (
     <Page footer={<AdminFooter navigation={navigation} active="Finance" />}>
       <Heading title="GESTÃO FINANCEIRA" />
-      <Button title="+ LANÇAMENTO" onPress={() => navigation.navigate("FinanceEntry")} />
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Button title="AJUDA CUSTO" secondary onPress={() => navigation.navigate("CostAid")} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button title="+ LANÇAMENTO" onPress={() => navigation.navigate("FinanceEntry")} />
+        </View>
+      </View>
       <Section>
         <Text style={styles.text}>Módulo em desenvolvimento.</Text>
         <Text style={styles.muted}>

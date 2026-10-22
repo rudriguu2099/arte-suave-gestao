@@ -9,6 +9,7 @@ import { EventsScreen, FinanceScreen, AttendanceScreen } from "../screens/Refere
 import { GroupFormScreen, GroupsScreen } from "../screens/GroupsScreen";
 import AtletasScreen from '../screens/AtletasScreen';
 import FinanceEntryScreen from "../screens/FinanceEntryScreen";
+import CostAidScreen from "../screens/CostAidScreen";
 import { useAccess } from "../features/access/AccessContext";
 import { isStaff, isSuperAdmin } from "../features/access/domain";
 import type { RootStackParamList } from "./types";
@@ -43,6 +44,7 @@ export default function Routes() {
               <>
                 <Stack.Screen name="Finance" component={FinanceScreen} />
                 <Stack.Screen name="FinanceEntry" component={FinanceEntryScreen} />
+                <Stack.Screen name="CostAid" component={CostAidScreen} />
                 <Stack.Screen name="Events" component={EventsScreen} />
               </>
             )}

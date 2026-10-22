@@ -3,7 +3,7 @@ import type { Expense, Revenue } from '../../generated/prisma/client.js';
 import { RevenueCategory } from '../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.module.js';
 import { displayDate } from '../access/access.validation.js';
-import type { ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto } from './dto/finance.dto.js';
+import type { CostAidQueryDto, ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto } from './dto/finance.dto.js';
 
 const withStudent = { student: { select: { id: true, name: true } } };
 
@@ -20,10 +20,10 @@ function view<T extends Revenue | Expense>(entry: T) {
   return { ...entry, amount: Number(entry.amount), date: displayDate(entry.date) };
 }
 
-// PATCH: ignora o que não veio; null só vale em studentId (desvincular atleta).
+// PATCH: ignora o que não veio; null só vale em studentId/beneficiary (alternar destino).
 function sent<T extends object>(patch: T): Partial<T> {
   return Object.fromEntries(
-    Object.entries(patch).filter(([key, value]) => value !== undefined && (value !== null || key === 'studentId')),
+    Object.entries(patch).filter(([key, value]) => value !== undefined && (value !== null || key === 'studentId' || key === 'beneficiary')),
   ) as Partial<T>;
 }
 
@@ -50,10 +50,69 @@ export class FinanceService {
     return view(await this.prisma.revenue.create({ data: await this.revenueFields(dto), include: withStudent }));
   }
 
+  // HU017 / RF014: relação mensal de atletas que contribuíram e pendentes na ajuda de custo.
+  async listCostAid(query: CostAidQueryDto = {}) {
+    const now = new Date();
+    const month = query.month ?? now.getUTCMonth() + 1;
+    const year = query.year ?? now.getUTCFullYear();
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+
+    const [students, revenues] = await Promise.all([
+      this.prisma.student.findMany({
+        where: { active: true },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.revenue.findMany({
+        where: {
+          category: RevenueCategory.AJUDA_DE_CUSTO,
+          studentId: { not: null },
+          date: { gte: start, lt: end },
+        },
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ]);
+
+    const byStudent = new Map<string, Revenue>();
+    for (const revenue of revenues) {
+      if (revenue.studentId && !byStudent.has(revenue.studentId)) {
+        byStudent.set(revenue.studentId, revenue);
+      }
+    }
+
+    const contributed: Array<{ id: string; name: string; revenueId: string; amount: number; date: string; paymentMethod: string }> = [];
+    const pending: Array<{ id: string; name: string }> = [];
+
+    for (const student of students) {
+      const entry = byStudent.get(student.id);
+      if (entry) {
+        contributed.push({
+          id: student.id,
+          name: student.name,
+          revenueId: entry.id,
+          amount: Number(entry.amount),
+          date: displayDate(entry.date),
+          paymentMethod: entry.paymentMethod,
+        });
+      } else {
+        pending.push({ id: student.id, name: student.name });
+      }
+    }
+
+    return { month, year, contributed, pending };
+  }
+
   // Edição parcial: completa o que não veio com os dados atuais e valida tudo de novo.
   async updateRevenue(id: string, patch: UpdateRevenueDto) {
     const current = view(await this.findRevenue(id));
-    const data = await this.revenueFields({ ...current, title: current.title ?? undefined, ...sent(patch) });
+    const data = await this.revenueFields({
+      ...current,
+      title: current.title ?? undefined,
+      donor: current.donor ?? undefined,
+      beneficiary: current.beneficiary ?? undefined,
+      ...sent(patch),
+    });
     return view(await this.prisma.revenue.update({ where: { id }, data, include: withStudent }));
   }
 
@@ -82,13 +141,34 @@ export class FinanceService {
     await this.prisma.expense.delete({ where: { id } });
   }
 
-  // Atleta só é vinculado em Ajuda de Custo; nas outras categorias o vínculo é descartado.
+  // Atleta é obrigatório em Ajuda de Custo; em Doação/Patrocínio exige doador e destino (atleta ou beneficiado).
   private async revenueFields(dto: RevenueDto) {
-    const studentId = dto.category === RevenueCategory.AJUDA_DE_CUSTO ? (dto.studentId ?? null) : null;
+    const isCostAid = dto.category === RevenueCategory.AJUDA_DE_CUSTO;
+    const isDonation = dto.category === RevenueCategory.PATROCINIO_DOACAO;
+    const donor = dto.donor?.trim();
+    const beneficiary = dto.beneficiary?.trim();
+
+    if (isCostAid && !dto.studentId) {
+      throw new BadRequestException('Selecione o atleta para a categoria Ajuda de custo.');
+    }
+    if (isDonation && !donor) {
+      throw new BadRequestException('Informe o doador ou patrocinador para a categoria Doação/Patrocínio.');
+    }
+    const studentId = isCostAid || isDonation ? (dto.studentId ?? null) : null;
+    if (isDonation && !studentId && !beneficiary) {
+      throw new BadRequestException('Informe o beneficiado para a categoria Doação/Patrocínio.');
+    }
     if (studentId && !(await this.prisma.student.findUnique({ where: { id: studentId }, select: { id: true } }))) {
       throw new NotFoundException('Atleta não encontrado.');
     }
-    return { ...entryFields(dto), category: dto.category, paymentMethod: dto.paymentMethod, studentId };
+    return {
+      ...entryFields(dto),
+      category: dto.category,
+      donor: isDonation ? donor! : null,
+      beneficiary: isDonation && !studentId ? beneficiary! : null,
+      paymentMethod: dto.paymentMethod,
+      studentId,
+    };
   }
 
   private expenseFields(dto: ExpenseDto) {

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Length, Matches, Max, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Length, Matches, Max, MaxLength, Min } from 'class-validator';
 import { ExpenseCategory, ExpenseStatus, PaymentMethod, RevenueCategory } from '../../../generated/prisma/enums.js';
 
 class FinanceEntryDto {
@@ -23,8 +24,22 @@ export class RevenueDto extends FinanceEntryDto {
   @ApiProperty({ enum: PaymentMethod, description: 'Forma de recebimento' })
   @IsEnum(PaymentMethod) paymentMethod: PaymentMethod;
 
-  @ApiPropertyOptional({ format: 'uuid', nullable: true, description: 'Atleta vinculado; só usado em AJUDA_DE_CUSTO (RF014). null desvincula.' })
+  @ApiPropertyOptional({ example: 'Empresa Local', maxLength: 80, description: 'Doador ou patrocinador; obrigatório (e só usado) em PATROCINIO_DOACAO (HU018 / RN011)' })
+  @IsOptional() @IsString() @MaxLength(80) donor?: string;
+
+  @ApiPropertyOptional({ example: 'Compra de tatames', maxLength: 80, description: 'Beneficiado/destino livre quando em PATROCINIO_DOACAO o destino for Outros (HU018 / RN011)' })
+  @IsOptional() @IsString() @MaxLength(80) beneficiary?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', nullable: true, description: 'Atleta vinculado; obrigatório em AJUDA_DE_CUSTO (RF014) e usado como destino em PATROCINIO_DOACAO (HU018).' })
   @IsOptional() @IsUUID() studentId?: string | null;
+}
+
+export class CostAidQueryDto {
+  @ApiPropertyOptional({ example: 9, minimum: 1, maximum: 12, description: 'Mês de referência (1 a 12). Padrão: mês atual.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(12) month?: number;
+
+  @ApiPropertyOptional({ example: 2026, minimum: 2000, maximum: 2100, description: 'Ano de referência. Padrão: ano atual.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(2000) @Max(2100) year?: number;
 }
 
 export class ExpenseDto extends FinanceEntryDto {
