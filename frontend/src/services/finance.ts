@@ -119,9 +119,13 @@ export const financeApi = {
   createRevenue: (token: string, input: RevenueInput) => api.post("/finance/revenues", input, token),
   updateRevenue: (token: string, id: string, input: RevenueUpdateInput) =>
     api.patch(`/finance/revenues/${encodeURIComponent(id)}`, input, token),
+  removeRevenue: (token: string, id: string) =>
+    api.delete(`/finance/revenues/${encodeURIComponent(id)}`, token),
   createExpense: (token: string, input: ExpenseInput) => api.post("/finance/expenses", input, token),
   updateExpense: (token: string, id: string, input: ExpenseInput) =>
     api.patch(`/finance/expenses/${encodeURIComponent(id)}`, input, token),
+  removeExpense: (token: string, id: string) =>
+    api.delete(`/finance/expenses/${encodeURIComponent(id)}`, token),
   listCostAid: (token: string, month: number, year: number) =>
     api.get<CostAidResponse>(`/finance/cost-aid?month=${month}&year=${year}`, token),
 };

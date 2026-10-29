@@ -63,6 +63,8 @@ export default function FinanceEntryScreen({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const submitted = useRef(false);
   if (!isSuperAdmin(current)) return null;
 
@@ -145,6 +147,25 @@ export default function FinanceEntryScreen({
       setSaving(false);
     }
   }
+
+  async function remove() {
+    if (!edit) return;
+    setDeleting(true);
+    setError("");
+    try {
+      if (edit.kind === "revenue") await financeApi.removeRevenue(getToken(), edit.id);
+      else await financeApi.removeExpense(getToken(), edit.id);
+      setConfirmDelete(false);
+      navigation.goBack();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) return signOut();
+      setConfirmDelete(false);
+      setError((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <Page footer={<AdminFooter navigation={navigation} active="Finance" />}>
       <Dialog
@@ -152,6 +173,15 @@ export default function FinanceEntryScreen({
         title={edit ? "Lançamento atualizado" : "Lançamento registrado"}
         message={`${revenue ? "Receita" : "Despesa"} de R$ ${amount} ${edit ? "atualizada" : "registrada"}.`}
         onClose={navigation.goBack}
+      />
+      <Dialog
+        visible={confirmDelete}
+        title="Excluir lançamento"
+        message={`Deseja excluir esta ${revenue ? "receita" : "despesa"} de R$ ${amount}? O saldo do período será recalculado.`}
+        confirmLabel="EXCLUIR"
+        busy={deleting}
+        onConfirm={remove}
+        onClose={() => setConfirmDelete(false)}
       />
       <Back onPress={navigation.goBack} />
       <Heading title={edit ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"} />
@@ -256,6 +286,14 @@ export default function FinanceEntryScreen({
           />
         </View>
       </View>
+      {edit && (
+        <Button
+          title="EXCLUIR LANÇAMENTO"
+          secondary
+          disabled={saving || deleting}
+          onPress={() => setConfirmDelete(true)}
+        />
+      )}
     </Page>
   );
 }
