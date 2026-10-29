@@ -91,6 +91,19 @@ export function moedaParaNumero(valor: string): number {
   return Number(valor.replace(/\D/g, "")) / 100;
 }
 
+// Converte valor numérico (ex.: 1850.5) para máscara "1.850,50" usada nos inputs e nos cards.
+export function numeroParaMoeda(valor: number): string {
+  const centavos = String(Math.round(Math.abs(valor) * 100)).padStart(3, "0");
+  return centavos.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "," + centavos.slice(-2);
+}
+
+// Exibição em reais: "R$ 260,00" / "R$ -1.590,00" (comSinal=false) ou "+R$ 200,00" / "-R$ 350,00" (comSinal=true).
+export function formatarReais(valor: number, comSinal = false): string {
+  const formatado = numeroParaMoeda(valor);
+  if (comSinal) return (valor < 0 ? "-R$ " : "+R$ ") + formatado;
+  return valor < 0 ? `R$ -${formatado}` : `R$ ${formatado}`;
+}
+
 // Mesmas regras do FinanceService do backend (RF012/RF013/HU018); extra = forma de recebimento ou situação.
 export function validarLancamento(l: {
   categoria: string;

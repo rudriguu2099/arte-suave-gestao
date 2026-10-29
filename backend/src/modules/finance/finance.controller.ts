@@ -27,6 +27,17 @@ import { CostAidQueryDto, ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenu
 export class FinanceController {
   constructor(private readonly service: FinanceService) {}
 
+  @ApiOperation({
+    summary: 'Painel financeiro mensal com histórico de 6 meses (HU019 / RF016)',
+    description:
+      'Retorna totais do mês (receitas, despesas totais/pagas/pendentes e saldo), histórico dos últimos 6 meses até o mês selecionado, despesas por categoria, relação de despesas pendentes e lançamentos do período.',
+  })
+  @ApiOkResponse({ description: 'Resumo mensal, séries dos gráficos de barras e lançamentos do mês' })
+  @Get('summary')
+  getSummary(@Query() query: CostAidQueryDto) {
+    return this.service.getMonthlySummary(query);
+  }
+
   @ApiOperation({ summary: 'Relação mensal de ajuda de custo por atleta (HU017 / RF014)' })
   @ApiOkResponse({ description: 'Atletas ativos divididos em contributed e pending no mês/ano de referência' })
   @Get('cost-aid')

@@ -26,7 +26,7 @@ import {
   paymentMethods,
   revenueCategories,
 } from "../services/finance";
-import { formatarMoeda, moedaParaNumero, validarLancamento } from "../utils/validators";
+import { formatarMoeda, moedaParaNumero, numeroParaMoeda, validarLancamento } from "../utils/validators";
 
 type Kind = "revenue" | "expense";
 const kinds = [
@@ -34,24 +34,32 @@ const kinds = [
   { kind: "expense", label: "DESPESA", color: "#D80000" },
 ] as const;
 
-// HU015 (receita), HU016 (despesa) e HU018 (doação/patrocínio).
+// HU015 (receita), HU016 (despesa), HU018 (doação/patrocínio) e edição a partir do painel (HU019 / RF012 / RF013).
 export default function FinanceEntryScreen({
   navigation,
   route,
 }: NativeStackScreenProps<RootStackParamList, "FinanceEntry">) {
   const { current, athletes, getToken, signOut } = useAccess();
-  const [kind, setKind] = useState<Kind>("revenue");
-  const [category, setCategory] = useState(route.params?.category ?? "");
-  const [title, setTitle] = useState("");
-  const [donor, setDonor] = useState("");
-  const [destination, setDestination] = useState("");
-  const [beneficiary, setBeneficiary] = useState("");
-  const [amount, setAmount] = useState(route.params?.amount ?? "");
-  const [date, setDate] = useState(route.params?.date ?? "");
-  const [description, setDescription] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [status, setStatus] = useState("");
-  const [studentId, setStudentId] = useState(route.params?.studentId ?? "");
+  const edit = route.params?.edit;
+  const initialDestination =
+    edit?.kind === "revenue" && edit.category === "PATROCINIO_DOACAO"
+      ? edit.studentId
+        ? edit.studentId
+        : "OUTROS"
+      : "";
+
+  const [kind, setKind] = useState<Kind>(edit?.kind ?? "revenue");
+  const [category, setCategory] = useState(edit?.category ?? route.params?.category ?? "");
+  const [title, setTitle] = useState(edit?.title ?? "");
+  const [donor, setDonor] = useState(edit?.donor ?? "");
+  const [destination, setDestination] = useState(initialDestination);
+  const [beneficiary, setBeneficiary] = useState(edit?.beneficiary ?? "");
+  const [amount, setAmount] = useState(edit ? numeroParaMoeda(edit.amount) : (route.params?.amount ?? ""));
+  const [date, setDate] = useState(edit?.date ?? route.params?.date ?? "");
+  const [description, setDescription] = useState(edit?.description ?? "");
+  const [paymentMethod, setPaymentMethod] = useState(edit?.paymentMethod ?? "");
+  const [status, setStatus] = useState(edit?.status ?? "");
+  const [studentId, setStudentId] = useState(edit?.studentId ?? route.params?.studentId ?? "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -63,13 +71,19 @@ export default function FinanceEntryScreen({
     .filter((athlete) => athlete.active)
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((athlete) => ({ value: athlete.id, label: athlete.name }));
+  if (edit?.student && !activeAthletes.some((option) => option.value === edit.student!.id)) {
+    activeAthletes.push({ value: edit.student.id, label: edit.student.name });
+  }
   const destinationOptions = [...activeAthletes, { value: "OUTROS", label: "Outros" }];
+
   function changeKind(next: Kind) {
+    if (edit) return;
     // As categorias de receita e despesa são diferentes; OUTROS existe nas duas.
     if (category !== "OUTROS") setCategory("");
     setKind(next);
     setError("");
   }
+
   async function save() {
     if (submitted.current) return;
     const invalid = validarLancamento({
@@ -96,21 +110,32 @@ export default function FinanceEntryScreen({
       description: description.trim(),
     };
     try {
-      if (revenue)
-        await financeApi.createRevenue(getToken(), {
+      if (revenue) {
+        const linkedStudentId =
+          category === "AJUDA_DE_CUSTO"
+            ? studentId
+            : category === "PATROCINIO_DOACAO" && destination !== "OUTROS"
+              ? destination
+              : edit
+                ? null
+                : undefined;
+        const payload = {
           ...entry,
           paymentMethod,
           donor: category === "PATROCINIO_DOACAO" ? donor.trim() : undefined,
           beneficiary:
             category === "PATROCINIO_DOACAO" && destination === "OUTROS" ? beneficiary.trim() : undefined,
-          studentId:
-            category === "AJUDA_DE_CUSTO"
-              ? studentId
-              : category === "PATROCINIO_DOACAO" && destination !== "OUTROS"
-                ? destination
-                : undefined,
-        });
-      else await financeApi.createExpense(getToken(), { ...entry, status });
+        };
+        if (edit) {
+          await financeApi.updateRevenue(getToken(), edit.id, { ...payload, studentId: linkedStudentId });
+        } else {
+          await financeApi.createRevenue(getToken(), { ...payload, studentId: linkedStudentId ?? undefined });
+        }
+      } else if (edit) {
+        await financeApi.updateExpense(getToken(), edit.id, { ...entry, status });
+      } else {
+        await financeApi.createExpense(getToken(), { ...entry, status });
+      }
       setDone(true);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return signOut();
@@ -124,12 +149,12 @@ export default function FinanceEntryScreen({
     <Page footer={<AdminFooter navigation={navigation} active="Finance" />}>
       <Dialog
         visible={done}
-        title="Lançamento registrado"
-        message={`${revenue ? "Receita" : "Despesa"} de R$ ${amount} registrada.`}
+        title={edit ? "Lançamento atualizado" : "Lançamento registrado"}
+        message={`${revenue ? "Receita" : "Despesa"} de R$ ${amount} ${edit ? "atualizada" : "registrada"}.`}
         onClose={navigation.goBack}
       />
       <Back onPress={navigation.goBack} />
-      <Heading title="NOVO LANÇAMENTO" />
+      <Heading title={edit ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"} />
       <View style={{ flexDirection: "row" }}>
         {kinds.map((option) => {
           const active = kind === option.kind;
@@ -137,7 +162,8 @@ export default function FinanceEntryScreen({
             <Pressable
               key={option.kind}
               accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
+              accessibilityState={{ selected: active, disabled: !!edit }}
+              disabled={!!edit}
               onPress={() => changeKind(option.kind)}
               style={{
                 flex: 1,
@@ -147,6 +173,7 @@ export default function FinanceEntryScreen({
                 borderWidth: 1,
                 borderColor: active ? option.color : colors.border,
                 backgroundColor: active ? option.color : colors.paper,
+                opacity: edit && !active ? 0.45 : 1,
               }}
             >
               <Text style={[styles.text, { color: active ? colors.paper : colors.ink }]}>{option.label}</Text>
@@ -222,7 +249,11 @@ export default function FinanceEntryScreen({
       <View style={styles.row}>
         <Button title="CANCELAR" secondary disabled={saving} onPress={navigation.goBack} />
         <View style={{ flex: 1 }}>
-          <Button title={saving ? "REGISTRANDO..." : "REGISTRAR"} disabled={saving} onPress={save} />
+          <Button
+            title={saving ? (edit ? "SALVANDO..." : "REGISTRANDO...") : edit ? "SALVAR" : "REGISTRAR"}
+            disabled={saving}
+            onPress={save}
+          />
         </View>
       </View>
     </Page>

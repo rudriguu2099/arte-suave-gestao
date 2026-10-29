@@ -63,13 +63,20 @@ test("group validation mirrors backend rules and time mask", async () => {
 });
 
 test("currency mask turns typed digits into cents", async () => {
-  const { formatarMoeda, moedaParaNumero } = await import("../src/utils/validators.ts");
+  const { formatarMoeda, moedaParaNumero, numeroParaMoeda, formatarReais } = await import("../src/utils/validators.ts");
   assert.equal(formatarMoeda("5"), "0,05");
   assert.equal(formatarMoeda("0,050"), "0,50");
   assert.equal(formatarMoeda("123456"), "1.234,56");
   assert.equal(formatarMoeda("99999999999"), "99.999.999,99");
   assert.equal(formatarMoeda("abc"), "");
   assert.equal(moedaParaNumero("1.234,56"), 1234.56);
+  assert.equal(numeroParaMoeda(0), "0,00");
+  assert.equal(numeroParaMoeda(260), "260,00");
+  assert.equal(numeroParaMoeda(1850.5), "1.850,50");
+  assert.equal(formatarReais(260), "R$ 260,00");
+  assert.equal(formatarReais(-1590), "R$ -1.590,00");
+  assert.equal(formatarReais(200, true), "+R$ 200,00");
+  assert.equal(formatarReais(-350, true), "-R$ 350,00");
 });
 
 test("finance entry validation mirrors the backend rules", async () => {

@@ -8,7 +8,7 @@ describe('FinanceService', () => {
   let service: FinanceService;
   let prisma: {
     revenue: Record<'create' | 'update' | 'findUnique' | 'findMany', ReturnType<typeof vi.fn>>;
-    expense: Record<'create' | 'update' | 'findUnique', ReturnType<typeof vi.fn>>;
+    expense: Record<'create' | 'update' | 'findUnique' | 'findMany', ReturnType<typeof vi.fn>>;
     student: { findUnique: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
   };
 
@@ -228,6 +228,145 @@ describe('FinanceService', () => {
           { id: 's3', name: 'Lucas Alves' },
         ],
       });
+    });
+  });
+
+  describe('getMonthlySummary (HU019 / RF016)', () => {
+    it('calcula totais do mês, histórico de 6 meses, despesas por categoria, pendentes e lançamentos ordenados', async () => {
+      prisma.revenue.findMany.mockResolvedValue([
+        {
+          id: 'rev-sep-2',
+          category: 'PATROCINIO_DOACAO',
+          title: null,
+          donor: 'Empresa Local',
+          beneficiary: 'Quimonos',
+          amount: '230.00',
+          date: new Date('2026-09-15T00:00:00Z'),
+          paymentMethod: 'PIX',
+          description: 'Doação empresa local',
+          studentId: null,
+          student: null,
+          createdAt: new Date('2026-09-15T12:00:00Z'),
+        },
+        {
+          id: 'rev-sep-1',
+          category: 'AJUDA_DE_CUSTO',
+          title: null,
+          donor: null,
+          beneficiary: null,
+          amount: '30.00',
+          date: new Date('2026-09-07T00:00:00Z'),
+          paymentMethod: 'DINHEIRO',
+          description: 'Setembro',
+          studentId: 's3',
+          student: { id: 's3', name: 'Lucas Alves' },
+          createdAt: new Date('2026-09-07T10:00:00Z'),
+        },
+        {
+          id: 'rev-aug-1',
+          category: 'OUTROS',
+          title: 'Rifa',
+          donor: null,
+          beneficiary: null,
+          amount: '500.00',
+          date: new Date('2026-08-10T00:00:00Z'),
+          paymentMethod: 'PIX',
+          description: '',
+          studentId: null,
+          student: null,
+          createdAt: new Date('2026-08-10T10:00:00Z'),
+        },
+      ]);
+
+      prisma.expense.findMany.mockResolvedValue([
+        {
+          id: 'exp-sep-2',
+          category: 'MATERIAIS',
+          title: null,
+          amount: '350.00',
+          date: new Date('2026-09-20T00:00:00Z'),
+          status: 'PENDENTE',
+          description: 'Quimonos infantis',
+          createdAt: new Date('2026-09-20T09:00:00Z'),
+        },
+        {
+          id: 'exp-sep-1',
+          category: 'ALUGUEL',
+          title: null,
+          amount: '1500.00',
+          date: new Date('2026-09-05T00:00:00Z'),
+          status: 'PAGA',
+          description: 'Aluguel do espaço',
+          createdAt: new Date('2026-09-05T09:00:00Z'),
+        },
+        {
+          id: 'exp-aug-1',
+          category: 'TRANSPORTE',
+          title: null,
+          amount: '120.00',
+          date: new Date('2026-08-18T00:00:00Z'),
+          status: 'PAGA',
+          description: 'Van campeonato',
+          createdAt: new Date('2026-08-18T09:00:00Z'),
+        },
+      ]);
+
+      const summary = await service.getMonthlySummary({ month: 9, year: 2026 });
+
+      expect(summary.month).toBe(9);
+      expect(summary.year).toBe(2026);
+      expect(summary.totals).toEqual({
+        revenues: 260,
+        expenses: 1850,
+        paidExpenses: 1500,
+        pendingExpenses: 350,
+        pendingCount: 1,
+        balance: -1590,
+      });
+      expect(summary.history).toEqual([
+        { month: 4, year: 2026, revenues: 0, expenses: 0, balance: 0 },
+        { month: 5, year: 2026, revenues: 0, expenses: 0, balance: 0 },
+        { month: 6, year: 2026, revenues: 0, expenses: 0, balance: 0 },
+        { month: 7, year: 2026, revenues: 0, expenses: 0, balance: 0 },
+        { month: 8, year: 2026, revenues: 500, expenses: 120, balance: 380 },
+        { month: 9, year: 2026, revenues: 260, expenses: 1850, balance: -1590 },
+      ]);
+      expect(summary.expensesByCategory).toEqual([
+        { category: 'ALUGUEL', total: 1500, paid: 1500, pending: 0 },
+        { category: 'MATERIAIS', total: 350, paid: 0, pending: 350 },
+      ]);
+      expect(summary.pendingExpenses).toHaveLength(1);
+      expect(summary.pendingExpenses[0]).toMatchObject({
+        id: 'exp-sep-2',
+        category: 'MATERIAIS',
+        amount: 350,
+        date: '20/09/2026',
+        status: 'PENDENTE',
+      });
+      expect(summary.entries.map((entry) => `${entry.kind}:${entry.id}`)).toEqual([
+        'expense:exp-sep-2',
+        'revenue:rev-sep-2',
+        'revenue:rev-sep-1',
+        'expense:exp-sep-1',
+      ]);
+    });
+
+    it('atravessa corretamente a virada de ano na janela de 6 meses', async () => {
+      prisma.revenue.findMany.mockResolvedValue([]);
+      prisma.expense.findMany.mockResolvedValue([]);
+
+      const summary = await service.getMonthlySummary({ month: 2, year: 2026 });
+
+      expect(summary.history.map((point) => `${point.month}/${point.year}`)).toEqual([
+        '9/2025',
+        '10/2025',
+        '11/2025',
+        '12/2025',
+        '1/2026',
+        '2/2026',
+      ]);
+      expect(summary.totals.balance).toBe(0);
+      expect(summary.entries).toEqual([]);
     });
   });
 });

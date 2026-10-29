@@ -6,6 +6,8 @@ import { displayDate } from '../access/access.validation.js';
 import type { CostAidQueryDto, ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto } from './dto/finance.dto.js';
 
 const withStudent = { student: { select: { id: true, name: true } } };
+const toCents = (value: unknown) => Math.round(Number(value) * 100);
+const fromCents = (cents: number) => cents / 100;
 
 // DD/MM/AAAA -> Date (UTC); recusa datas que não existem, como 31/02.
 export function parseDate(value: string): Date {
@@ -48,6 +50,112 @@ export class FinanceService {
 
   async createRevenue(dto: RevenueDto) {
     return view(await this.prisma.revenue.create({ data: await this.revenueFields(dto), include: withStudent }));
+  }
+
+  // HU019 / RF016: painel mensal com totais, histórico de 6 meses, despesas por categoria, pendentes e lançamentos do mês.
+  async getMonthlySummary(query: CostAidQueryDto = {}) {
+    const now = new Date();
+    const month = query.month ?? now.getUTCMonth() + 1;
+    const year = query.year ?? now.getUTCFullYear();
+    const historyStart = new Date(Date.UTC(year, month - 6, 1));
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const monthEnd = new Date(Date.UTC(year, month, 1));
+
+    const [revenues6m, expenses6m] = await Promise.all([
+      this.prisma.revenue.findMany({
+        where: { date: { gte: historyStart, lt: monthEnd } },
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        include: withStudent,
+      }),
+      this.prisma.expense.findMany({
+        where: { date: { gte: historyStart, lt: monthEnd } },
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ]);
+
+    const buckets = new Map<string, { month: number; year: number; revCents: number; expCents: number }>();
+    for (let offset = -5; offset <= 0; offset++) {
+      const d = new Date(Date.UTC(year, month - 1 + offset, 1));
+      const m = d.getUTCMonth() + 1;
+      const y = d.getUTCFullYear();
+      buckets.set(`${y}-${m}`, { month: m, year: y, revCents: 0, expCents: 0 });
+    }
+    for (const rev of revenues6m) {
+      const key = `${rev.date.getUTCFullYear()}-${rev.date.getUTCMonth() + 1}`;
+      const bucket = buckets.get(key);
+      if (bucket) bucket.revCents += toCents(rev.amount);
+    }
+    for (const exp of expenses6m) {
+      const key = `${exp.date.getUTCFullYear()}-${exp.date.getUTCMonth() + 1}`;
+      const bucket = buckets.get(key);
+      if (bucket) bucket.expCents += toCents(exp.amount);
+    }
+    const history = [...buckets.values()].map(({ month: m, year: y, revCents, expCents }) => ({
+      month: m,
+      year: y,
+      revenues: fromCents(revCents),
+      expenses: fromCents(expCents),
+      balance: fromCents(revCents - expCents),
+    }));
+
+    const monthRevenues = revenues6m.filter((r) => r.date >= monthStart && r.date < monthEnd);
+    const monthExpenses = expenses6m.filter((e) => e.date >= monthStart && e.date < monthEnd);
+
+    const revCents = monthRevenues.reduce((sum, r) => sum + toCents(r.amount), 0);
+    let paidExpCents = 0;
+    let pendingExpCents = 0;
+    let pendingCount = 0;
+    const byCategory = new Map<string, { paidCents: number; pendingCents: number }>();
+
+    for (const exp of monthExpenses) {
+      const cents = toCents(exp.amount);
+      const current = byCategory.get(exp.category) ?? { paidCents: 0, pendingCents: 0 };
+      if (exp.status === 'PENDENTE') {
+        pendingExpCents += cents;
+        pendingCount++;
+        current.pendingCents += cents;
+      } else {
+        paidExpCents += cents;
+        current.paidCents += cents;
+      }
+      byCategory.set(exp.category, current);
+    }
+
+    const totalExpCents = paidExpCents + pendingExpCents;
+    const expensesByCategory = [...byCategory.entries()]
+      .map(([category, { paidCents, pendingCents }]) => ({
+        category,
+        total: fromCents(paidCents + pendingCents),
+        paid: fromCents(paidCents),
+        pending: fromCents(pendingCents),
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const pendingExpenses = monthExpenses.filter((e) => e.status === 'PENDENTE').map(view);
+
+    const entries = [
+      ...monthRevenues.map((raw) => ({ raw, item: { kind: 'revenue' as const, ...view(raw) } })),
+      ...monthExpenses.map((raw) => ({ raw, item: { kind: 'expense' as const, ...view(raw) } })),
+    ]
+      .sort((a, b) => b.raw.date.getTime() - a.raw.date.getTime() || b.raw.createdAt.getTime() - a.raw.createdAt.getTime())
+      .map(({ item }) => item);
+
+    return {
+      month,
+      year,
+      totals: {
+        revenues: fromCents(revCents),
+        expenses: fromCents(totalExpCents),
+        paidExpenses: fromCents(paidExpCents),
+        pendingExpenses: fromCents(pendingExpCents),
+        pendingCount,
+        balance: fromCents(revCents - totalExpCents),
+      },
+      history,
+      expensesByCategory,
+      pendingExpenses,
+      entries,
+    };
   }
 
   // HU017 / RF014: relação mensal de atletas que contribuíram e pendentes na ajuda de custo.

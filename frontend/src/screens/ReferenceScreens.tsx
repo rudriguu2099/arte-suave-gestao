@@ -3,7 +3,6 @@ import { Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AdminFooter, EventCards } from "../components/access";
 import {
-  Button,
   Field,
   Heading,
   Page,
@@ -14,33 +13,6 @@ import {
 import { useAccess } from "../features/access/AccessContext";
 import { ageOn, isStaff, isSuperAdmin } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
-
-export function FinanceScreen({
-  navigation,
-}: NativeStackScreenProps<RootStackParamList, "Finance">) {
-  const { current } = useAccess();
-  if (!isSuperAdmin(current)) return null;
-  return (
-    <Page footer={<AdminFooter navigation={navigation} active="Finance" />}>
-      <Heading title="GESTÃO FINANCEIRA" />
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <Button title="AJUDA CUSTO" secondary onPress={() => navigation.navigate("CostAid")} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button title="+ LANÇAMENTO" onPress={() => navigation.navigate("FinanceEntry")} />
-        </View>
-      </View>
-      <Section>
-        <Text style={styles.text}>Módulo em desenvolvimento.</Text>
-        <Text style={styles.muted}>
-          As funcionalidades financeiras estarão disponíveis em uma próxima
-          etapa.
-        </Text>
-      </Section>
-    </Page>
-  );
-}
 
 export function EventsScreen({
   navigation,

@@ -68,6 +68,22 @@ export type Event = {
   kind: "meeting" | "championship";
 };
 
+export type EditableFinanceEntry = {
+  kind: "revenue" | "expense";
+  id: string;
+  category: string;
+  title: string | null;
+  amount: number;
+  date: string;
+  description: string;
+  paymentMethod?: string;
+  donor?: string | null;
+  beneficiary?: string | null;
+  studentId?: string | null;
+  student?: { id: string; name: string } | null;
+  status?: "PAGA" | "PENDENTE";
+};
+
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
@@ -77,7 +93,15 @@ export type RootStackParamList = {
   Groups: undefined;
   GroupForm: { groupId: string } | undefined;
   Finance: undefined;
-  FinanceEntry: { category?: string; studentId?: string; amount?: string; date?: string } | undefined;
+  FinanceEntry:
+    | {
+        category?: string;
+        studentId?: string;
+        amount?: string;
+        date?: string;
+        edit?: EditableFinanceEntry;
+      }
+    | undefined;
   CostAid: undefined;
   Events: undefined;
   Students: { groupId?: string } | undefined;
