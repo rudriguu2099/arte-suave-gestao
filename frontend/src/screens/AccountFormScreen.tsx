@@ -6,6 +6,7 @@ import {
   Button,
   Check,
   Contacts,
+  DateField,
   ErrorMessage,
   Dialog,
   Field,
@@ -18,7 +19,6 @@ import {
 import { useAccess } from "../features/access/AccessContext";
 import {
   ageOn,
-  formatBirthDate,
   initialPassword,
   isSuperAdmin,
   isStaff,
@@ -180,14 +180,7 @@ export default function AccountFormScreen({
           onChangeText={setName}
           autoCapitalize="words"
         />
-        <Field
-          label="Data de nascimento *"
-          placeholder="dd/mm/aaaa"
-          keyboardType="number-pad"
-          maxLength={10}
-          value={birthDate}
-          onChangeText={(value) => setBirthDate(formatBirthDate(value))}
-        />
+        <DateField label="Data de nascimento *" value={birthDate} onChange={setBirthDate} />
         <Field
           label="Idade (calculada)"
           value={age >= 0 ? age + " anos" : ""}
