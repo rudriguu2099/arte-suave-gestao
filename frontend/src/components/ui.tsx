@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { Calendar, LocaleConfig } from "react-native-calendars";
+import { formatBirthDate } from "../features/access/domain";
 
 export const colors = {
   ink: "#202020",
@@ -428,6 +430,68 @@ export function Select({
                 </Pressable>
               ))}
             </ScrollView>
+            <Button title="Fechar" secondary onPress={() => setOpen(false)} />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+LocaleConfig.locales["pt-br"] = {
+  monthNames: ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"],
+  monthNamesShort: ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"],
+  dayNames: ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"],
+  dayNamesShort: ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"],
+  today: "Hoje",
+};
+LocaleConfig.defaultLocale = "pt-br";
+
+// Data digitada (máscara dd/mm/aaaa) ou escolhida no calendário (react-native-calendars, que trabalha em AAAA-MM-DD).
+export function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const iso = /^\d{2}\/\d{2}\/\d{4}$/.test(value) ? value.split("/").reverse().join("-") : undefined;
+  return (
+    <View style={[styles.row, { alignItems: "flex-end", gap: 8 }]}>
+      <View style={{ flex: 1 }}>
+        <Field
+          label={label}
+          placeholder="dd/mm/aaaa"
+          keyboardType="number-pad"
+          maxLength={10}
+          value={value}
+          onChangeText={(text) => onChange(formatBirthDate(text))}
+        />
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: abrir calendário`}
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [styles.input, { justifyContent: "center", opacity: pressed ? 0.6 : 1 }]}
+      >
+        <MaterialIcons name="calendar-today" size={20} color={colors.ink} />
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#00000066", padding: 24 }}>
+          <View accessibilityViewIsModal style={[styles.card, { width: "100%", maxWidth: 380 }]}>
+            <Calendar
+              current={iso}
+              hideExtraDays={false}
+              markedDates={iso ? { [iso]: { selected: true } } : undefined}
+              onDayPress={(day) => {
+                onChange(day.dateString.split("-").reverse().join("/"));
+                setOpen(false);
+              }}
+              theme={{
+                arrowColor: colors.ink,
+                monthTextColor: colors.ink,
+                textSectionTitleColor: colors.ink,
+                dayTextColor: colors.ink,
+                textDisabledColor: colors.muted,
+                todayTextColor: colors.error,
+                selectedDayBackgroundColor: colors.ink,
+                selectedDayTextColor: colors.paper,
+              }}
+            />
             <Button title="Fechar" secondary onPress={() => setOpen(false)} />
           </View>
         </View>
