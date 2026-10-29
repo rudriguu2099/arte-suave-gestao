@@ -574,17 +574,12 @@ export default function FinanceScreen({
 
                   <View style={[styles.row, { justifyContent: "space-between", alignItems: "flex-end" }]}>
                     <Text style={[styles.muted, { flex: 1, fontSize: 11 }]}>{entrySubtitle(entry)}</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Editar ${titleText}`}
-                      hitSlop={8}
+                    <Button
+                      title="EDITAR"
+                      compact
+                      secondary
                       onPress={() => navigation.navigate("FinanceEntry", { edit: entry })}
-                      style={({ pressed }) => ({ paddingVertical: 2, paddingLeft: 8, opacity: pressed ? 0.6 : 1 })}
-                    >
-                      <Text style={{ fontSize: 10, fontWeight: "800", letterSpacing: 0.6, color: colors.muted }}>
-                        EDITAR
-                      </Text>
-                    </Pressable>
+                    />
                   </View>
                 </View>
               );
