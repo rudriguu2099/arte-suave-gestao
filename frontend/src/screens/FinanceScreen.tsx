@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View, Pressable } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { AdminFooter } from "../components/access";
@@ -54,8 +54,8 @@ function categoryOptions(tab: FilterTab) {
       : tab === "expenses" || tab === "pending"
         ? expenseCategories
         : [...revenueCategories, ...expenseCategories].filter(
-            (option, index, all) => all.findIndex((other) => other.value === option.value) === index,
-          );
+          (option, index, all) => all.findIndex((other) => other.value === option.value) === index,
+        );
   return [{ value: "", label: "Todas" }, ...list];
 }
 
@@ -574,6 +574,7 @@ export default function FinanceScreen({
               );
             })}
           </View>
+
         </View>
 
         <Pressable
@@ -649,14 +650,14 @@ export default function FinanceScreen({
         ) : (
           <Text style={styles.muted}>
             {applied
-            ? "Nenhum lançamento encontrado para os filtros selecionados"
-            : filter === "pending"
-              ? "Nenhuma despesa pendente neste mês."
-              : filter === "revenues"
-                ? "Nenhuma receita registrada neste mês."
-                : filter === "expenses"
-                  ? "Nenhuma despesa registrada neste mês."
-                  :"Nenhum lançamento registrado neste mês."}
+              ? "Nenhum lançamento encontrado para os filtros selecionados"
+              : filter === "pending"
+                ? "Nenhuma despesa pendente neste mês."
+                : filter === "revenues"
+                  ? "Nenhuma receita registrada neste mês."
+                  : filter === "expenses"
+                    ? "Nenhuma despesa registrada neste mês."
+                    : "Nenhum lançamento registrado neste mês."}
           </Text>
         )}
       </View>

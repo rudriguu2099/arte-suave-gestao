@@ -6,6 +6,7 @@ import {
   Back,
   Button,
   colors,
+  DateField,
   Dialog,
   ErrorMessage,
   Field,
@@ -16,7 +17,7 @@ import {
   styles,
 } from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
-import { formatBirthDate, isSuperAdmin } from "../features/access/domain";
+import { isSuperAdmin } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
 import { ApiError } from "../services/api";
 import {
@@ -229,14 +230,7 @@ export default function FinanceEntryScreen({
           value={amount}
           onChangeText={(value) => setAmount(formatarMoeda(value))}
         />
-        <Field
-          label="Data *"
-          placeholder="dd/mm/aaaa"
-          keyboardType="number-pad"
-          maxLength={10}
-          value={date}
-          onChangeText={(value) => setDate(formatBirthDate(value))}
-        />
+        <DateField label="Data *" value={date} onChange={setDate} />
         <Field
           label="Descrição"
           placeholder="Descrição do lançamento"
