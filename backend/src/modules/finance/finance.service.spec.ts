@@ -369,7 +369,7 @@ describe('FinanceService', () => {
       expect(summary.entries).toEqual([]);
     });
   });
-  
+
   describe('listHistory (HU022 / RF019)', () => {
   // Formato em que o Prisma devolve: amount como string decimal e date como Date.
   const aid = {

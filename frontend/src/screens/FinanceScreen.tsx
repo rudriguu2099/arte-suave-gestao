@@ -3,17 +3,19 @@ import { Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { AdminFooter } from "../components/access";
-import { Back, Button, colors, ErrorMessage, Heading, Page, styles } from "../components/ui";
+import { Back, Button, colors, ErrorMessage, Field, Heading, Page, Select, styles } from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
-import { isSuperAdmin } from "../features/access/domain";
+import { formatBirthDate, isSuperAdmin, parseBirthDate } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
 import { ApiError } from "../services/api";
+import { FinanceEntryCard, financePalette as palette } from "../components/finance";
 import {
+  expenseCategories,
   expenseCategoryLabel,
   financeApi,
-  paymentMethodLabel,
-  revenueCategoryLabel,
+  revenueCategories,
   type FinanceEntryItem,
+  type FinanceHistoryFilters,
   type FinanceSummaryResponse,
 } from "../services/finance";
 import { formatarReais } from "../utils/validators";
@@ -35,19 +37,6 @@ const monthNames = [
 
 const shortMonths = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-const palette = {
-  green: "#059669",
-  chartGreen: "#00C814",
-  red: "#E02424",
-  amber: "#D97706",
-  paidBg: "#E6F7EF",
-  paidBorder: "#A7F3D0",
-  pendingBg: "#FEF3C7",
-  pendingBorder: "#FCD34D",
-  pendingText: "#B45309",
-  pillTrack: "#EAEAEA",
-};
-
 type FilterTab = "revenues" | "all" | "expenses" | "pending";
 
 function createInitialHistory(month: number, year: number) {
@@ -57,20 +46,31 @@ function createInitialHistory(month: number, year: number) {
   });
 }
 
-function entrySubtitle(entry: FinanceEntryItem): string {
-  const parts: string[] = [];
-  if (entry.description.trim()) parts.push(entry.description.trim());
-  if (entry.kind === "revenue") {
-    if (entry.student?.name) parts.push(`Atleta: ${entry.student.name}`);
-    if (entry.donor) parts.push(`Doador: ${entry.donor}`);
-    if (!entry.student?.name && entry.beneficiary) parts.push(`Beneficiado: ${entry.beneficiary}`);
-    parts.push(entry.date);
-    parts.push(paymentMethodLabel(entry.paymentMethod).toLowerCase());
-  } else {
-    parts.push(entry.date);
-  }
-  return parts.join(" · ");
+// HU022: categorias conforme a aba; em "Todos", junta as duas listas sem repetir OUTROS.
+function categoryOptions(tab: FilterTab) {
+  const list =
+    tab === "revenues"
+      ? revenueCategories
+      : tab === "expenses" || tab === "pending"
+        ? expenseCategories
+        : [...revenueCategories, ...expenseCategories].filter(
+            (option, index, all) => all.findIndex((other) => other.value === option.value) === index,
+          );
+  return [{ value: "", label: "Todas" }, ...list];
 }
+
+// Mesmas regras do backend; a mensagem do intervalo é a do BDD.
+function periodError(from: string, to: string): string | null {
+  const start = from ? parseBirthDate(from) : null;
+  const end = to ? parseBirthDate(to) : null;
+  if (from && !start) return "Informe uma data inicial válida (dd/mm/aaaa).";
+  if (to && !end) return "Informe uma data final válida (dd/mm/aaaa).";
+  if (start && end && start > end) return "A data inicial não pode ser superior à data final";
+  return null;
+}
+
+const sumCents = (entries: FinanceEntryItem[]) =>
+  entries.reduce((sum, entry) => sum + Math.round(entry.amount * 100), 0) / 100;
 
 // HU019 / RF016: painel mensal de finanças com totais, despesas pendentes, gráficos de barras e lançamentos do período.
 export default function FinanceScreen({
@@ -92,6 +92,15 @@ export default function FinanceScreen({
   }));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // HU022: null = lançamentos do mês; com valor = histórico filtrado.
+  const [showFilters, setShowFilters] = useState(false);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [category, setCategory] = useState("");
+  const [filterError, setFilterError] = useState("");
+  const [applied, setApplied] = useState<FinanceHistoryFilters | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<FinanceEntryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,6 +126,32 @@ export default function FinanceScreen({
     });
   }, [navigation, load]);
 
+  const loadHistory = useCallback(async () => {
+    if (!applied) return;
+    setHistoryLoading(true);
+    setFilterError("");
+    try {
+      const response = await financeApi.listHistory(getToken(), applied);
+      setHistoryEntries(response.entries);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) return signOut();
+      setFilterError((e as Error).message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [getToken, applied, signOut]);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  // Ao voltar da edição ou exclusão, refaz a busca filtrada (HU021).
+  useEffect(() => {
+    return navigation.addListener("focus", () => {
+      void loadHistory();
+    });
+  }, [navigation, loadHistory]);
+
   if (!isSuperAdmin(current)) return null;
 
   function changeMonth(delta: number) {
@@ -134,16 +169,38 @@ export default function FinanceScreen({
     return `${day}/${String(month).padStart(2, "0")}/${year}`;
   }
 
+  function changeTab(next: FilterTab) {
+    setFilter(next);
+    if (!categoryOptions(next).some((option) => option.value === category)) setCategory("");
+  }
+
+  function applyFilters() {
+    const invalid = periodError(from, to);
+    setFilterError(invalid ?? "");
+    if (!invalid) setApplied({ from, to, category });
+  }
+
+  function clearFilters() {
+    setFrom("");
+    setTo("");
+    setCategory("");
+    setFilterError("");
+    setApplied(null);
+  }
+
   const maxHistory = Math.max(...data.history.flatMap((point) => [point.revenues, point.expenses]), 1);
   const maxAbsBalance = Math.max(...data.history.map((point) => Math.abs(point.balance)), 1);
   const maxCategoryExpense = Math.max(...data.expensesByCategory.map((item) => item.total), 1);
 
-  const filteredEntries = data.entries.filter((entry) => {
+  const filteredEntries = (applied ? historyEntries : data.entries).filter((entry) => {
     if (filter === "revenues") return entry.kind === "revenue";
     if (filter === "expenses") return entry.kind === "expense";
     if (filter === "pending") return entry.kind === "expense" && entry.status === "PENDENTE";
     return true;
   });
+
+  const listedRevenues = sumCents(filteredEntries.filter((entry) => entry.kind === "revenue"));
+  const listedExpenses = sumCents(filteredEntries.filter((entry) => entry.kind === "expense"));
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "revenues", label: "Receitas" },
@@ -476,7 +533,7 @@ export default function FinanceScreen({
       {/* Cabeçalho e filtro segmentado de lançamentos do período */}
       <View style={{ gap: 12 }}>
         <View style={[styles.wrap, { justifyContent: "space-between", gap: 10 }]}>
-          <Text style={[styles.heading, { fontSize: 18 }]}>Últimos Lançamentos</Text>
+          <Text style={[styles.heading, { fontSize: 18 }]}>{applied ? "Lançamentos Filtrados" : "Últimos Lançamentos"}</Text>
           <View
             style={{
               flexDirection: "row",
@@ -496,7 +553,7 @@ export default function FinanceScreen({
                   key={tab.key}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
-                  onPress={() => setFilter(tab.key)}
+                  onPress={() => changeTab(tab.key)}
                   style={{
                     paddingHorizontal: 10,
                     paddingVertical: 5,
@@ -519,86 +576,87 @@ export default function FinanceScreen({
           </View>
         </View>
 
-        {/* Lista de cards de lançamentos do mês selecionado */}
-        {loading ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showFilters }}
+          onPress={() => setShowFilters((open) => !open)}
+          style={[styles.row, { alignSelf: "flex-end", gap: 4 }]}
+        >
+          <MaterialIcons name="filter-list" size={18} color={applied ? colors.ink : colors.muted} />
+          <Text style={{ fontSize: 11, fontWeight: "800", letterSpacing: 0.6, color: applied ? colors.ink : colors.muted }}>
+            {applied ? "FILTROS ATIVOS" : "FILTROS"}
+          </Text>
+        </Pressable>
+
+        {showFilters && (
+          <View style={[styles.card, { padding: 14, gap: 12 }]}>
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Field
+                  label="De"
+                  placeholder="dd/mm/aaaa"
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  value={from}
+                  onChangeText={(value) => setFrom(formatBirthDate(value))}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field
+                  label="Até"
+                  placeholder="dd/mm/aaaa"
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  value={to}
+                  onChangeText={(value) => setTo(formatBirthDate(value))}
+                />
+              </View>
+            </View>
+            <Select label="Categoria" value={category} onChange={setCategory} options={categoryOptions(filter)} />
+            <ErrorMessage message={filterError} />
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Button title="LIMPAR FILTROS" secondary onPress={clearFilters} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button title="FILTRAR" onPress={applyFilters} />
+              </View>
+            </View>
+          </View>
+        )}
+
+        {applied && !historyLoading && filteredEntries.length > 0 && (
+          <Text style={[styles.muted, { fontSize: 12 }]}>
+            {filteredEntries.length} {filteredEntries.length === 1 ? "lançamento" : "lançamentos"} · Receitas{" "}
+            {formatarReais(listedRevenues)} · Despesas {formatarReais(listedExpenses)} · Saldo{" "}
+            {formatarReais(listedRevenues - listedExpenses)}
+          </Text>
+        )}
+
+        {/* Lista de cards de lançamentos do mês selecionado ou do histórico filtrado (HU022) */}
+        {loading || historyLoading ? (
           <Text style={styles.muted}>Carregando...</Text>
         ) : filteredEntries.length ? (
           <View style={{ gap: 10 }}>
-            {filteredEntries.map((entry) => {
-              const isRevenue = entry.kind === "revenue";
-              const titleText = isRevenue
-                ? revenueCategoryLabel(entry.category, entry.title)
-                : expenseCategoryLabel(entry.category, entry.title);
-              const signedValue = formatarReais(isRevenue ? entry.amount : -entry.amount, true);
-              const isPaid = !isRevenue && entry.status === "PAGA";
-
-              return (
-                <View key={`${entry.kind}-${entry.id}`} style={[styles.card, { padding: 14, gap: 6 }]}>
-                  <View style={[styles.row, { justifyContent: "space-between", alignItems: "flex-start" }]}>
-                    <View style={[styles.wrap, { flex: 1 }]}>
-                      <Text style={[styles.text, { fontWeight: "700", fontSize: 15 }]}>{titleText}</Text>
-                      {!isRevenue && (
-                        <View
-                          style={{
-                            paddingHorizontal: 7,
-                            paddingVertical: 2,
-                            borderRadius: 3,
-                            borderWidth: 1,
-                            backgroundColor: isPaid ? palette.paidBg : palette.pendingBg,
-                            borderColor: isPaid ? palette.paidBorder : palette.pendingBorder,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 9,
-                              fontWeight: "800",
-                              letterSpacing: 0.6,
-                              color: isPaid ? palette.green : palette.pendingText,
-                            }}
-                          >
-                            {isPaid ? "PAGO" : "PENDENTE"}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        fontWeight: "800",
-                        color: isRevenue ? palette.green : palette.red,
-                      }}
-                    >
-                      {signedValue}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.row, { justifyContent: "space-between", alignItems: "flex-end" }]}>
-                    <Text style={[styles.muted, { flex: 1, fontSize: 11 }]}>{entrySubtitle(entry)}</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Editar ${titleText}`}
-                      hitSlop={8}
-                      onPress={() => navigation.navigate("FinanceEntry", { edit: entry })}
-                      style={({ pressed }) => ({ paddingVertical: 2, paddingLeft: 8, opacity: pressed ? 0.6 : 1 })}
-                    >
-                      <Text style={{ fontSize: 10, fontWeight: "800", letterSpacing: 0.6, color: colors.muted }}>
-                        EDITAR
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              );
-            })}
+            {filteredEntries.map((entry) => (
+              <FinanceEntryCard
+                key={`${entry.kind}-${entry.id}`}
+                entry={entry}
+                onEdit={() => navigation.navigate("FinanceEntry", { edit: entry })}
+              />
+            ))}
           </View>
         ) : (
           <Text style={styles.muted}>
-            {filter === "pending"
+            {applied
+            ? "Nenhum lançamento encontrado para os filtros selecionados"
+            : filter === "pending"
               ? "Nenhuma despesa pendente neste mês."
               : filter === "revenues"
                 ? "Nenhuma receita registrada neste mês."
                 : filter === "expenses"
                   ? "Nenhuma despesa registrada neste mês."
-                  : "Nenhum lançamento registrado neste mês."}
+                  :"Nenhum lançamento registrado neste mês."}
           </Text>
         )}
       </View>
