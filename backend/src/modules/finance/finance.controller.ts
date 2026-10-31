@@ -15,7 +15,7 @@ import {
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard.js';
 import { FinanceService } from './finance.service.js';
-import { CostAidQueryDto, ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto } from './dto/finance.dto.js';
+import { CostAidQueryDto, ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto, FinanceHistoryQueryDto } from './dto/finance.dto.js';
 
 // Valores saem como number e datas como DD/MM/AAAA.
 @ApiTags('finance')
@@ -43,6 +43,16 @@ export class FinanceController {
   @Get('cost-aid')
   listCostAid(@Query() query: CostAidQueryDto) {
     return this.service.listCostAid(query);
+  }
+  @ApiOperation({
+    summary: 'Histórico de lançamentos com filtro por período, tipo e categoria (HU022 / RF019)',
+    description: 'Todos os filtros são opcionais; sem filtros, retorna todos os lançamentos, mais recentes primeiro. O período (from/to) é inclusivo.',
+  })
+  @ApiOkResponse({ description: 'Lançamentos filtrados e totais (receitas, despesas, saldo e quantidade)' })
+  @ApiBadRequestResponse({ description: 'Data inválida, data inicial superior à final, tipo ou categoria inválidos' })
+  @Get('entries')
+  listHistory(@Query() query: FinanceHistoryQueryDto) {
+    return this.service.listHistory(query);
   }
 
   @ApiOperation({ summary: 'Lista as receitas, mais recentes primeiro (RF012)' })

@@ -113,15 +113,39 @@ export type CostAidResponse = {
   pending: { id: string; name: string }[];
 };
 
+// HU022 / RF019: filtros opcionais do histórico; datas em DD/MM/AAAA.
+export type FinanceHistoryFilters = {
+  from?: string;
+  to?: string;
+  type?: "revenue" | "expense";
+  category?: string;
+};
+
+export type FinanceHistoryResponse = {
+  totals: { revenues: number; expenses: number; balance: number; count: number };
+  entries: FinanceEntryItem[];
+};
+
 export const financeApi = {
   getSummary: (token: string, month: number, year: number) =>
     api.get<FinanceSummaryResponse>(`/finance/summary?month=${month}&year=${year}`, token),
+  listHistory: (token: string, filters: FinanceHistoryFilters) => {
+    // Só manda os filtros preenchidos; URLSearchParams já codifica a "/" das datas.
+    const params = new URLSearchParams(
+      Object.entries(filters).filter(([, value]) => value) as [string, string][],
+    );
+    return api.get<FinanceHistoryResponse>(`/finance/entries?${params}`, token);
+  },
   createRevenue: (token: string, input: RevenueInput) => api.post("/finance/revenues", input, token),
   updateRevenue: (token: string, id: string, input: RevenueUpdateInput) =>
     api.patch(`/finance/revenues/${encodeURIComponent(id)}`, input, token),
+  removeRevenue: (token: string, id: string) =>
+    api.delete(`/finance/revenues/${encodeURIComponent(id)}`, token),
   createExpense: (token: string, input: ExpenseInput) => api.post("/finance/expenses", input, token),
   updateExpense: (token: string, id: string, input: ExpenseInput) =>
     api.patch(`/finance/expenses/${encodeURIComponent(id)}`, input, token),
+  removeExpense: (token: string, id: string) =>
+    api.delete(`/finance/expenses/${encodeURIComponent(id)}`, token),
   listCostAid: (token: string, month: number, year: number) =>
     api.get<CostAidResponse>(`/finance/cost-aid?month=${month}&year=${year}`, token),
 };
