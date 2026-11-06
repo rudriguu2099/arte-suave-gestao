@@ -47,6 +47,7 @@ model Student {
   account    User?       @relation("StudentAccount", fields: [accountId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_9aade3cfe3e20d001e056d11b84")
   group      SchoolGroup @relation(fields: [groupId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_cc296de36cadf8de53b9cd60aa7")
   revenues   Revenue[]
+  attendanceRecords AttendanceRecord[]
 
   @@map("students")
 }
@@ -60,8 +61,36 @@ model SchoolGroup {
   schedule String    @db.VarChar
   active   Boolean   @default(true)
   students Student[]
+  attendances Attendance[]
 
   @@map("school_groups")
+}
+
+// RF020: uma chamada por turma e data; cada registro conta na chamada e na frequência do atleta.
+model Attendance {
+  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId   String             @db.VarChar(80)
+  date      DateTime           @db.Date
+  createdAt DateTime           @default(now()) @db.Timestamp(6)
+
+  group     SchoolGroup        @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  records   AttendanceRecord[]
+
+  @@unique([groupId, date])
+  @@map("attendances")
+}
+
+model AttendanceRecord {
+  attendanceId String     @db.Uuid
+  studentId    String     @db.Uuid
+  present      Boolean
+
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@id([attendanceId, studentId])
+  @@index([studentId])
+  @@map("attendance_records")
 }
 
 // RF012 / HU018: title só em OUTROS; donor e beneficiary só em PATROCINIO_DOACAO; studentId em AJUDA_DE_CUSTO e PATROCINIO_DOACAO.

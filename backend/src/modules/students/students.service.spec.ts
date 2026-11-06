@@ -15,6 +15,9 @@ describe('StudentsService', () => {
     schoolGroup: {
       findUnique: ReturnType<typeof vi.fn>;
     };
+    attendanceRecord: {
+      groupBy: ReturnType<typeof vi.fn>;
+    };
   };
 
   const studentId = '11111111-1111-1111-1111-111111111111';
@@ -49,6 +52,9 @@ describe('StudentsService', () => {
       },
       schoolGroup: {
         findUnique: vi.fn(),
+      },
+      attendanceRecord: {
+        groupBy: vi.fn().mockResolvedValue([]),
       },
     };
 
@@ -139,7 +145,6 @@ describe('StudentsService', () => {
       belt: 'Branca',
       active: true,
       groupId: 'adult',
-      attendance: [true, false, true],
       group: { id: 'adult', name: 'Adulto' },
       ...over,
     });
@@ -221,30 +226,20 @@ describe('StudentsService', () => {
       );
     });
 
-    it('calcula absenceCount a partir de attendance', async () => {
-      prisma.student.findMany.mockResolvedValue([
-        row({ attendance: [true, false, true, false, false] }),
-      ]);
+    it('calcula absenceCount pelas faltas das chamadas dos últimos 3 meses (RN014)', async () => {
+      vi.useFakeTimers({ now: new Date('2026-11-06T12:00:00Z') });
+      prisma.student.findMany.mockResolvedValue([row(), row({ id: 'bbb', name: 'Bia' })]);
+      prisma.attendanceRecord.groupBy.mockResolvedValue([{ studentId: 'aaa', _count: { _all: 2 } }]);
 
       const result = await service.findAll({});
 
-      expect(result[0].absenceCount).toBe(3);
-    });
-
-    it('retorna absenceCount 0 quando attendance está vazio', async () => {
-      prisma.student.findMany.mockResolvedValue([row({ attendance: [] })]);
-
-      const result = await service.findAll({});
-
-      expect(result[0].absenceCount).toBe(0);
-    });
-
-    it('retorna absenceCount 0 quando attendance não é array', async () => {
-      prisma.student.findMany.mockResolvedValue([row({ attendance: null })]);
-
-      const result = await service.findAll({});
-
-      expect(result[0].absenceCount).toBe(0);
+      expect(prisma.attendanceRecord.groupBy.mock.calls[0][0].where).toEqual({
+        studentId: { in: ['aaa', 'bbb'] },
+        present: false,
+        attendance: { date: { gte: new Date('2026-08-06T00:00:00Z') } },
+      });
+      expect(result.map((student) => student.absenceCount)).toEqual([2, 0]);
+      vi.useRealTimers();
     });
   });
 });

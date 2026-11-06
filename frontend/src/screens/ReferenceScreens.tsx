@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AdminFooter, EventCards } from "../components/access";
 import {
@@ -78,79 +78,6 @@ export function StudentsScreen({
       ))}
       {!filtered.length && (
         <Text style={styles.muted}>Nenhum aluno encontrado.</Text>
-      )}
-    </Page>
-  );
-}
-
-export function AttendanceScreen({
-  navigation,
-}: NativeStackScreenProps<RootStackParamList, "Attendance">) {
-  const { athletes, groups, current } = useAccess();
-  const [groupId, setGroupId] = useState("all");
-  if (!isStaff(current)) return null;
-  const filtered = athletes.filter(
-    (athlete) =>
-      athlete.active && (groupId === "all" || athlete.groupId === groupId),
-  );
-  return (
-    <Page footer={<AdminFooter navigation={navigation} active="Attendance" />}>
-      <Heading
-        title="FREQUÊNCIA"
-        subtitle="Consulta dos treinos registrados"
-      />
-      <Select
-        label="Turma"
-        value={groupId}
-        onChange={setGroupId}
-        options={[
-          { value: "all", label: "Todas as turmas" },
-          ...groups.map((group) => ({ value: group.id, label: group.name })),
-        ]}
-      />
-      {filtered.map((athlete) => (
-        <Section key={athlete.id}>
-          <Text style={[styles.text, { fontWeight: "700" }]}>
-            {athlete.name}
-          </Text>
-          {athlete.attendance.length ? (
-            <>
-              <View style={styles.wrap}>
-                {athlete.attendance.map((present, index) => (
-                  <View
-                    key={index}
-                    accessibilityLabel={`Treino ${index + 1}: ${present ? "presente" : "ausente"}`}
-                    style={{
-                      backgroundColor: present ? "#202020" : "#F3F3F3",
-                      width: 28,
-                      height: 28,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: present ? "white" : "#555555",
-                        fontSize: 11,
-                      }}
-                    >
-                      {index + 1}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-              <Text style={styles.muted}>
-                {athlete.attendance.filter(Boolean).length}/
-                {athlete.attendance.length} treinos realizados
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.muted}>Nenhuma frequência registrada.</Text>
-          )}
-        </Section>
-      ))}
-      {!filtered.length && (
-        <Text style={styles.muted}>Nenhum aluno ativo nesta turma.</Text>
       )}
     </Page>
   );
