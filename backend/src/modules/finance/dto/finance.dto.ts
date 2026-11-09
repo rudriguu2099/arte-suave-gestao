@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Length, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Length, Matches, Max, MaxLength, Min } from 'class-validator';
 import { ExpenseCategory, ExpenseStatus, PaymentMethod, RevenueCategory } from '../../../generated/prisma/enums.js';
 
 class FinanceEntryDto {
@@ -53,3 +53,19 @@ export class ExpenseDto extends FinanceEntryDto {
 // PATCH: só o que mudar.
 export class UpdateRevenueDto extends PartialType(RevenueDto) {}
 export class UpdateExpenseDto extends PartialType(ExpenseDto) {}
+
+const allCategories = [...new Set([...Object.values(RevenueCategory), ...Object.values(ExpenseCategory)])];
+
+export class FinanceHistoryQueryDto {
+  @ApiPropertyOptional({ example: '01/10/2026', description: 'Início do período (DD/MM/AAAA)' })
+  @IsOptional() @Matches(/^\d{2}\/\d{2}\/\d{4}$/, { message: 'from deve usar DD/MM/AAAA.' }) from?: string;
+
+  @ApiPropertyOptional({ example: '31/10/2026', description: 'Fim do período, inclusivo (DD/MM/AAAA)' })
+  @IsOptional() @Matches(/^\d{2}\/\d{2}\/\d{4}$/, { message: 'to deve usar DD/MM/AAAA.' }) to?: string;
+
+  @ApiPropertyOptional({ enum: ['revenue', 'expense'], description: 'Sem valor: receitas e despesas' })
+  @IsOptional() @IsIn(['revenue', 'expense']) type?: 'revenue' | 'expense';
+
+  @ApiPropertyOptional({ enum: allCategories, description: 'Categoria de receita ou de despesa' })
+  @IsOptional() @IsIn(allCategories) category?: string;
+}

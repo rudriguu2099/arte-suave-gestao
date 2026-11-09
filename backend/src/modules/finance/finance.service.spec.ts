@@ -369,4 +369,93 @@ describe('FinanceService', () => {
       expect(summary.entries).toEqual([]);
     });
   });
+
+  describe('listHistory (HU022 / RF019)', () => {
+  // Formato em que o Prisma devolve: amount como string decimal e date como Date.
+  const aid = {
+    id: 'rev-1',
+    category: 'AJUDA_DE_CUSTO',
+    title: null,
+    donor: null,
+    beneficiary: null,
+    amount: '100.00',
+    date: new Date('2026-10-05T00:00:00Z'),
+    paymentMethod: 'PIX',
+    description: '',
+    studentId,
+    createdAt: new Date('2026-10-29T10:00:00Z'),
+    student: { id: studentId, name: 'João Silva' },
+  };
+  const rent = {
+    id: 'exp-1',
+    category: 'ALUGUEL',
+    title: null,
+    amount: '40.00',
+    date: new Date('2026-10-10T00:00:00Z'),
+    status: 'PAGA',
+    description: '',
+    createdAt: new Date('2026-10-29T10:00:00Z'),
+  };
+
+  beforeEach(() => {
+    prisma.revenue.findMany.mockResolvedValue([aid]);
+    prisma.expense.findMany.mockResolvedValue([rent]);
+  });
+
+  it('junta receitas e despesas, mais recentes primeiro, com os totais do filtro', async () => {
+    const result = await service.listHistory();
+
+    expect(result.totals).toEqual({ revenues: 100, expenses: 40, balance: 60, count: 2 });
+    expect(result.entries.map((entry) => [entry.kind, entry.date])).toEqual([
+      ['expense', '10/10/2026'],
+      ['revenue', '05/10/2026'],
+    ]);
+  });
+
+  it('trata o fim do período como inclusivo', async () => {
+    await service.listHistory({ from: '01/10/2026', to: '10/10/2026' });
+
+    expect(prisma.expense.findMany.mock.calls[0][0].where.date).toEqual({
+      gte: new Date('2026-10-01T00:00:00Z'),
+      lt: new Date('2026-10-11T00:00:00Z'),
+    });
+  });
+
+  it('com type expense não consulta receitas', async () => {
+    const result = await service.listHistory({ type: 'expense' });
+
+    expect(prisma.revenue.findMany).not.toHaveBeenCalled();
+    expect(result.totals).toEqual({ revenues: 0, expenses: 40, balance: -40, count: 1 });
+  });
+
+  it('com categoria só de despesa filtra a categoria e não consulta receitas', async () => {
+    await service.listHistory({ category: 'ALUGUEL' });
+
+    expect(prisma.revenue.findMany).not.toHaveBeenCalled();
+    expect(prisma.expense.findMany.mock.calls[0][0].where.category).toBe('ALUGUEL');
+  });
+
+  it('OUTROS existe nos dois tipos e consulta receitas e despesas', async () => {
+    await service.listHistory({ category: 'OUTROS' });
+
+    expect(prisma.revenue.findMany.mock.calls[0][0].where.category).toBe('OUTROS');
+    expect(prisma.expense.findMany.mock.calls[0][0].where.category).toBe('OUTROS');
+  });
+
+  it('devolve lista vazia quando tipo e categoria não combinam', async () => {
+    const result = await service.listHistory({ type: 'revenue', category: 'ALUGUEL' });
+
+    expect(prisma.revenue.findMany).not.toHaveBeenCalled();
+    expect(prisma.expense.findMany).not.toHaveBeenCalled();
+    expect(result).toEqual({ totals: { revenues: 0, expenses: 0, balance: 0, count: 0 }, entries: [] });
+  });
+
+  it('recusa data inicial superior à final antes de consultar o banco', async () => {
+    await expect(service.listHistory({ from: '31/12/2026', to: '01/01/2026' })).rejects.toThrow(
+      'A data inicial não pode ser superior à data final',
+    );
+    expect(prisma.revenue.findMany).not.toHaveBeenCalled();
+    expect(prisma.expense.findMany).not.toHaveBeenCalled();
+  });
+});
 });

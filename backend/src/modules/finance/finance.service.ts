@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Expense, Revenue } from '../../generated/prisma/client.js';
-import { RevenueCategory } from '../../generated/prisma/enums.js';
+import { RevenueCategory, ExpenseCategory } from '../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.module.js';
 import { displayDate } from '../access/access.validation.js';
-import type { CostAidQueryDto, ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto } from './dto/finance.dto.js';
+import type { CostAidQueryDto, ExpenseDto, RevenueDto, UpdateExpenseDto, UpdateRevenueDto, FinanceHistoryQueryDto } from './dto/finance.dto.js';
 
 const withStudent = { student: { select: { id: true, name: true } } };
 const toCents = (value: unknown) => Math.round(Number(value) * 100);
@@ -34,6 +34,16 @@ function entryFields({ category, title, amount, date, description }: RevenueDto 
   const name = title?.trim();
   if (category === 'OUTROS' && !name) throw new BadRequestException('Informe o título para a categoria Outros.');
   return { title: category === 'OUTROS' ? name : null, amount, date: parseDate(date), description: description?.trim() ?? '' };
+}
+
+// Junta receitas e despesas numa lista só, mais recentes primeiro.
+function mergeEntries(revenues: (Revenue & { student: { id: string; name: string } | null })[], expenses: Expense[]) {
+  return [
+    ...revenues.map((raw) => ({ raw, item: { kind: 'revenue' as const, ...view(raw) } })),
+    ...expenses.map((raw) => ({ raw, item: { kind: 'expense' as const, ...view(raw) } })),
+  ]
+    .sort((a, b) => b.raw.date.getTime() - a.raw.date.getTime() || b.raw.createdAt.getTime() - a.raw.createdAt.getTime())
+    .map(({ item }) => item);
 }
 
 @Injectable()
@@ -133,12 +143,7 @@ export class FinanceService {
 
     const pendingExpenses = monthExpenses.filter((e) => e.status === 'PENDENTE').map(view);
 
-    const entries = [
-      ...monthRevenues.map((raw) => ({ raw, item: { kind: 'revenue' as const, ...view(raw) } })),
-      ...monthExpenses.map((raw) => ({ raw, item: { kind: 'expense' as const, ...view(raw) } })),
-    ]
-      .sort((a, b) => b.raw.date.getTime() - a.raw.date.getTime() || b.raw.createdAt.getTime() - a.raw.createdAt.getTime())
-      .map(({ item }) => item);
+    const entries = mergeEntries(monthRevenues, monthExpenses);
 
     return {
       month,
@@ -209,6 +214,39 @@ export class FinanceService {
     }
 
     return { month, year, contributed, pending };
+  }
+
+  // HU022 / RF019: histórico filtrado por período, tipo e categoria; sem filtros traz tudo, mais recentes primeiro.
+  async listHistory({ from, to, type, category }: FinanceHistoryQueryDto = {}) {
+    const start = from ? parseDate(from) : undefined;
+    const end = to ? parseDate(to) : undefined;
+    if (start && end && start > end) throw new BadRequestException('A data inicial não pode ser superior à data final');
+    // "to" é inclusivo: busca até o início do dia seguinte.
+    const date = { gte: start, lt: end && new Date(end.getTime() + 86_400_000) };
+    const orderBy = [{ date: 'desc' as const }, { createdAt: 'desc' as const }];
+    const wantsRevenues = type !== 'expense' && (!category || category in RevenueCategory);
+    const wantsExpenses = type !== 'revenue' && (!category || category in ExpenseCategory);
+
+    const [revenues, expenses] = await Promise.all([
+      wantsRevenues
+        ? this.prisma.revenue.findMany({ where: { date, category: category as RevenueCategory | undefined }, orderBy, include: withStudent })
+        : [],
+      wantsExpenses
+        ? this.prisma.expense.findMany({ where: { date, category: category as ExpenseCategory | undefined }, orderBy })
+        : [],
+    ]);
+
+    const revCents = revenues.reduce((sum, r) => sum + toCents(r.amount), 0);
+    const expCents = expenses.reduce((sum, e) => sum + toCents(e.amount), 0);
+    return {
+      totals: {
+        revenues: fromCents(revCents),
+        expenses: fromCents(expCents),
+        balance: fromCents(revCents - expCents),
+        count: revenues.length + expenses.length,
+      },
+      entries: mergeEntries(revenues, expenses),
+    };
   }
 
   // Edição parcial: completa o que não veio com os dados atuais e valida tudo de novo.
