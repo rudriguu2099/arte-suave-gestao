@@ -2,6 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.module.js';
 import { ListStudentsQueryDto } from './dto/list-students-query.dto.js';
 
+// RN014: faltas apuradas nos últimos 3 meses.
+const ABSENCE_PERIOD_MONTHS = 3;
+
 @Injectable()
 export class StudentsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -43,12 +46,13 @@ export class StudentsService {
         belt: true,
         active: true,
         groupId: true,
-        attendance: true,
         group: { select: { id: true, name: true } },
         guardianId: true,
         guardian: { select: { name: true } },
       },
     });
+
+    const absences = await this.countAbsences(students.map((student) => student.id));
 
     return students.map((student) => ({
       id: student.id,
@@ -60,12 +64,18 @@ export class StudentsService {
       group: student.group,
       guardianId: student.guardianId,
       guardian: student.guardian,
-      absenceCount: this.countAbsences(student.attendance),
+      absenceCount: absences.get(student.id) ?? 0,
     }));
   }
 
-  private countAbsences(attendance: unknown): number {
-    if (!Array.isArray(attendance)) return 0;
-    return attendance.filter((entry) => entry === false).length;
+  private async countAbsences(studentIds: string[]) {
+    const now = new Date();
+    const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - ABSENCE_PERIOD_MONTHS, now.getUTCDate()));
+    const rows = await this.prisma.attendanceRecord.groupBy({
+      by: ['studentId'],
+      where: { studentId: { in: studentIds }, present: false, attendance: { date: { gte: since } } },
+      _count: { _all: true },
+    });
+    return new Map(rows.map((row) => [row.studentId, row._count._all]));
   }
 }

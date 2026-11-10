@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { AccessModule } from './modules/access/access.module.js';
 import { GroupsModule } from './modules/groups/groups.module.js';
 import { FinanceModule } from './modules/finance/finance.module.js';
+import { AttendanceModule } from './modules/attendance/attendance.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { FinanceModule } from './modules/finance/finance.module.js';
     StudentsModule,
     SchoolGroupsModule,
     FinanceModule,
+    AttendanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
