@@ -25,6 +25,26 @@ export type MyAttendanceResponse = {
   athletes: AthleteMonthlyAttendance[];
 };
 
+// HU025 / RF022: período obrigatório em DD/MM/AAAA; o "to" é inclusivo.
+export type AttendancePeriod = { from: string; to: string };
+
+type Ref = { id: string; name: string };
+
+export type StudentAttendanceHistory = {
+  student: Ref;
+  period: AttendancePeriod;
+  totals: { presences: number; absences: number; total: number };
+  records: { date: string; present: boolean; group: Ref }[];
+};
+
+export type GroupAttendanceHistory = {
+  group: Ref;
+  period: AttendancePeriod;
+  totals: { sessions: number; presences: number; absences: number };
+  attendances: { id: string; date: string; presences: number; absences: number }[];
+  athletes: { id: string; name: string; presences: number; absences: number }[];
+};
+
 export function createAttendance(input: AttendanceInput, token: string) {
   return api.post<{ id: string }>("/attendances", input, token);
 }
@@ -39,4 +59,15 @@ export function getMyAttendance(
   if (params.studentId) qs.push(`studentId=${encodeURIComponent(params.studentId)}`);
   const query = qs.length ? `?${qs.join("&")}` : "";
   return api.get<MyAttendanceResponse>(`/attendances/me${query}`, token);
+}
+
+export function getStudentAttendance(studentId: string, period: AttendancePeriod, token: string) {
+  return api.get<StudentAttendanceHistory>(`/attendances/students/${studentId}?${new URLSearchParams(period)}`, token);
+}
+
+export function getGroupAttendance(groupId: string, period: AttendancePeriod, token: string) {
+  return api.get<GroupAttendanceHistory>(
+    `/attendances/groups/${encodeURIComponent(groupId)}?${new URLSearchParams(period)}`,
+    token,
+  );
 }

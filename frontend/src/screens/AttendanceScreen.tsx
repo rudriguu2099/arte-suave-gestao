@@ -67,10 +67,17 @@ export function AttendanceScreen({
                 <MaterialIcons name={open ? "arrow-drop-up" : "arrow-drop-down"} size={28} color={colors.ink} />
               </Pressable>
               {open && (
-                <Button
-                  title="+ NOVA CHAMADA HOJE"
-                  onPress={() => navigation.navigate("AttendanceForm", { groupId: group.id })}
-                />
+                <View style={{ gap: 8 }}>
+                  <Button
+                    title="+ NOVA CHAMADA HOJE"
+                    onPress={() => navigation.navigate("AttendanceForm", { groupId: group.id })}
+                  />
+                  <Button
+                    secondary
+                    title="VER HISTÓRICO COMPLETO"
+                    onPress={() => navigation.navigate("AttendanceHistory", { groupId: group.id })}
+                  />
+                </View>
               )}
             </Section>
           );

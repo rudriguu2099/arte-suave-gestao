@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -17,7 +17,7 @@ import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import type { JwtPayload } from '../auth/auth.service.js';
 import { AttendanceService } from './attendance.service.js';
-import { AttendanceDto, AttendanceQueryDto } from './dto/attendance.dto.js';
+import { AttendanceDto, AttendanceHistoryQueryDto, AttendanceQueryDto } from './dto/attendance.dto.js';
 
 @ApiTags('attendances')
 @ApiBearerAuth()
@@ -54,5 +54,33 @@ export class AttendanceController {
   @Roles(Role.ADMINISTRADOR)
   create(@Body() dto: AttendanceDto) {
     return this.service.create(dto);
+  }
+
+  @ApiOperation({
+    summary: 'Histórico de frequência do atleta no período (HU025 / RF022)',
+    description: 'Total de presenças e faltas e a lista de chamadas do atleta, mais recentes primeiro. O período (from/to) é obrigatório e inclusivo.',
+  })
+  @ApiOkResponse({ description: 'Totais de presenças e faltas e as chamadas do período, com datas em DD/MM/AAAA' })
+  @ApiBadRequestResponse({ description: 'Id inválido, data inválida ou data inicial superior à final' })
+  @ApiForbiddenResponse({ description: 'Somente administradores acessam o histórico por atleta' })
+  @ApiNotFoundResponse({ description: 'Atleta não encontrado' })
+  @Get('students/:id')
+  @Roles(Role.ADMINISTRADOR)
+  historyByStudent(@Param('id', ParseUUIDPipe) studentId: string, @Query() query: AttendanceHistoryQueryDto) {
+    return this.service.historyByStudent(studentId, query);
+  }
+
+  @ApiOperation({
+    summary: 'Histórico de frequência da turma no período (HU025 / RF022)',
+    description: 'Quantidade de chamadas, totais da turma e presenças e faltas de cada atleta que participou das chamadas. O período (from/to) é obrigatório e inclusivo.',
+  })
+  @ApiOkResponse({ description: 'Totais da turma e presenças e faltas por atleta, em ordem alfabética' })
+  @ApiBadRequestResponse({ description: 'Data inválida ou data inicial superior à final' })
+  @ApiForbiddenResponse({ description: 'Somente administradores acessam o histórico por turma' })
+  @ApiNotFoundResponse({ description: 'Turma não encontrada' })
+  @Get('groups/:groupId')
+  @Roles(Role.ADMINISTRADOR)
+  historyByGroup(@Param('groupId') groupId: string, @Query() query: AttendanceHistoryQueryDto) {
+    return this.service.historyByGroup(groupId, query);
   }
 }
