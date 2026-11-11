@@ -81,8 +81,12 @@ export class AttendanceService {
     });
     if (!group) throw new NotFoundException('Turma não encontrada.');
 
-    const [sessions, counts] = await Promise.all([
-      this.prisma.attendance.count({ where: { groupId, date } }),
+    const [attendances, counts] = await Promise.all([
+      this.prisma.attendance.findMany({
+        where: { groupId, date },
+        orderBy: { date: 'desc' },
+        select: { id: true, date: true, records: { select: { present: true } } },
+      }),
       this.prisma.attendanceRecord.groupBy({
         by: ['studentId', 'present'],
         where: { attendance: { groupId, date } },
@@ -106,10 +110,14 @@ export class AttendanceService {
       group,
       period: { from: query.from, to: query.to },
       totals: {
-        sessions,
+        sessions: attendances.length,
         presences: athletes.reduce((sum, athlete) => sum + athlete.presences, 0),
         absences: athletes.reduce((sum, athlete) => sum + athlete.absences, 0),
       },
+      attendances: attendances.map((attendance) => {
+        const presences = attendance.records.filter((record) => record.present).length;
+        return { id: attendance.id, date: displayDate(attendance.date), presences, absences: attendance.records.length - presences };
+      }),
       athletes,
     };
   }

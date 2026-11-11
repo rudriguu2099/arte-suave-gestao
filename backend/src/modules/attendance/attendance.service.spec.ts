@@ -9,7 +9,7 @@ describe('AttendanceService', () => {
   let prisma: {
     schoolGroup: { findUnique: ReturnType<typeof vi.fn> };
     student: { count: ReturnType<typeof vi.fn>; findUnique: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
-    attendance: { create: ReturnType<typeof vi.fn>; count: ReturnType<typeof vi.fn> };
+    attendance: { create: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
     attendanceRecord: { findMany: ReturnType<typeof vi.fn>; groupBy: ReturnType<typeof vi.fn> };
   };
 
@@ -30,7 +30,7 @@ describe('AttendanceService', () => {
       },
       attendance: {
         create: vi.fn(({ data }) => Promise.resolve({ id: 'a1', ...data, records: data.records.create })),
-        count: vi.fn().mockResolvedValue(0),
+        findMany: vi.fn().mockResolvedValue([]),
       },
       attendanceRecord: { findMany: vi.fn().mockResolvedValue([]), groupBy: vi.fn().mockResolvedValue([]) },
     };
@@ -134,8 +134,12 @@ describe('AttendanceService', () => {
   describe('historyByGroup', () => {
     beforeEach(() => prisma.schoolGroup.findUnique.mockResolvedValue(adulto));
 
-    it('junta as contagens com os nomes e soma os totais da turma', async () => {
-      prisma.attendance.count.mockResolvedValue(3);
+    it('lista as chamadas, junta as contagens com os nomes e soma os totais da turma', async () => {
+      prisma.attendance.findMany.mockResolvedValue([
+        { id: 'c3', date: new Date('2026-11-10T00:00:00Z'), records: [{ present: true }, { present: true }] },
+        { id: 'c2', date: new Date('2026-11-05T00:00:00Z'), records: [{ present: true }, { present: false }] },
+        { id: 'c1', date: new Date('2026-11-03T00:00:00Z'), records: [{ present: true }, { present: true }] },
+      ]);
       prisma.attendanceRecord.groupBy.mockResolvedValue([
         { studentId: joao, present: true, _count: { _all: 2 } },
         { studentId: joao, present: false, _count: { _all: 1 } },
@@ -152,6 +156,11 @@ describe('AttendanceService', () => {
         group: adulto,
         period,
         totals: { sessions: 3, presences: 5, absences: 1 },
+        attendances: [
+          { id: 'c3', date: '10/11/2026', presences: 2, absences: 0 },
+          { id: 'c2', date: '05/11/2026', presences: 1, absences: 1 },
+          { id: 'c1', date: '03/11/2026', presences: 2, absences: 0 },
+        ],
         athletes: [
           { id: ana, name: 'Ana Souza', presences: 3, absences: 0 },
           { id: joao, name: 'João Silva', presences: 2, absences: 1 },
@@ -167,7 +176,7 @@ describe('AttendanceService', () => {
 
       await service.historyByGroup('turma-1', period);
 
-      expect(prisma.attendance.count).toHaveBeenCalledWith({ where: { groupId: 'turma-1', date: dateFilter } });
+      expect(prisma.attendance.findMany.mock.calls[0][0]).toMatchObject({ where: { groupId: 'turma-1', date: dateFilter }, orderBy: { date: 'desc' } });
       expect(prisma.attendanceRecord.groupBy.mock.calls[0][0].where).toEqual({ attendance: { groupId: 'turma-1', date: dateFilter } });
       expect(prisma.student.findMany.mock.calls[0][0].where).toEqual({ id: { in: [joao] } });
     });
@@ -186,6 +195,7 @@ describe('AttendanceService', () => {
         group: adulto,
         period,
         totals: { sessions: 0, presences: 0, absences: 0 },
+        attendances: [],
         athletes: [],
       });
     });
