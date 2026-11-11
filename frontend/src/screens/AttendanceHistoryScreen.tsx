@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AdminFooter } from "../components/access";
@@ -75,10 +75,19 @@ export default function AttendanceHistoryScreen({
     }
   }
 
-  // Abre já consultando o mês atual.
+  const searchRef = useRef(search);
+  searchRef.current = search;
+
+  // Abre já consultando o mês atual e atualiza ao voltar da edição de chamada (HU024).
   useEffect(() => {
     search();
   }, [studentId, groupId]);
+
+  useEffect(() => {
+    return navigation.addListener("focus", () => {
+      searchRef.current();
+    });
+  }, [navigation]);
 
   if (!isStaff(current)) return null;
 
@@ -116,14 +125,31 @@ export default function AttendanceHistoryScreen({
               <Text style={[styles.label, { color: colors.muted }]}>TODAS AS CHAMADAS</Text>
               {group.attendances.map((attendance) => (
                 <Section key={attendance.id}>
-                  <Text style={[styles.text, { fontWeight: "700", fontSize: 16 }]}>{attendance.date}</Text>
-                  <Text style={[styles.muted, { fontSize: 11 }]}>
-                    {attendance.presences + attendance.absences} atleta(s) na chamada
-                  </Text>
-                  <View style={styles.wrap}>
-                    <Pill tone="ok" text={`${attendance.presences} PRES.`} />
-                    <Pill tone="bad" text={`${attendance.absences} FALT.`} />
-                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Editar chamada de ${attendance.date}`}
+                    onPress={() =>
+                      navigation.navigate("AttendanceForm", {
+                        groupId: group.group.id,
+                        attendanceId: attendance.id,
+                      })
+                    }
+                    style={({ pressed }) => ({ gap: 12, opacity: pressed ? 0.65 : 1 })}
+                  >
+                    <View style={styles.row}>
+                      <Text style={[styles.text, { flex: 1, fontWeight: "700", fontSize: 16 }]}>
+                        {attendance.date}
+                      </Text>
+                      <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+                    </View>
+                    <Text style={[styles.muted, { fontSize: 11 }]}>
+                      {attendance.presences + attendance.absences} atleta(s) na chamada
+                    </Text>
+                    <View style={styles.wrap}>
+                      <Pill tone="ok" text={`${attendance.presences} PRES.`} />
+                      <Pill tone="bad" text={`${attendance.absences} FALT.`} />
+                    </View>
+                  </Pressable>
                 </Section>
               ))}
               {!group.attendances.length && <Text style={styles.muted}>Nenhuma chamada registrada no período.</Text>}

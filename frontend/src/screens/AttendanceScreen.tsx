@@ -19,7 +19,7 @@ import { useAccess } from "../features/access/AccessContext";
 import { isStaff } from "../features/access/domain";
 import { weekdayLabels, type RootStackParamList } from "../features/access/types";
 import { ApiError } from "../services/api";
-import { createAttendance } from "../services/attendance";
+import { createAttendance, getAttendance, updateAttendance } from "../services/attendance";
 import { getStudents, type Student } from "../services/students";
 
 // Turmas ativas; cada uma abre a chamada do dia (HU023 / RF020).
@@ -88,13 +88,13 @@ export function AttendanceScreen({
   );
 }
 
-//Todos começam presentes; desligar a chave marca ausente.
+// Todos começam presentes na nova chamada; na edição (HU024 / RF021), carrega a chamada anterior.
 export function AttendanceFormScreen({
   navigation,
   route,
 }: NativeStackScreenProps<RootStackParamList, "AttendanceForm">) {
   const { groups, current, getToken, signOut } = useAccess();
-  const { groupId } = route.params;
+  const { groupId, attendanceId } = route.params;
   const group = groups.find((item) => item.id === groupId);
   const [date, setDate] = useState(new Date().toLocaleDateString("pt-BR"));
   const [athletes, setAthletes] = useState<Student[]>([]);
@@ -106,14 +106,24 @@ export function AttendanceFormScreen({
   const submitted = useRef(false);
 
   useEffect(() => {
-    getStudents({ groupId, active: true }, getToken())
-      .then(setAthletes)
+    const token = getToken();
+    const load = attendanceId
+      ? Promise.all([getStudents({ groupId, active: true }, token), getAttendance(attendanceId, token)]).then(
+          ([students, attendance]) => {
+            setDate(attendance.date);
+            setAthletes(students);
+            setAbsent(new Set(attendance.records.filter((r) => !r.present).map((r) => r.studentId)));
+          },
+        )
+      : getStudents({ groupId, active: true }, token).then(setAthletes);
+
+    load
       .catch((e) => {
         if (e instanceof ApiError && e.status === 401) return signOut();
         setError((e as Error).message);
       })
       .finally(() => setLoading(false));
-  }, [groupId]);
+  }, [groupId, attendanceId]);
 
   if (!isStaff(current)) return null;
 
@@ -132,11 +142,13 @@ export function AttendanceFormScreen({
     submitted.current = true;
     setSaving(true);
     setError("");
+    const records = athletes.map((a) => ({ studentId: a.id, present: !absent.has(a.id) }));
     try {
-      await createAttendance(
-        { groupId, date, records: athletes.map((a) => ({ studentId: a.id, present: !absent.has(a.id) })) },
-        getToken(),
-      );
+      if (attendanceId) {
+        await updateAttendance(attendanceId, { date, records }, getToken());
+      } else {
+        await createAttendance({ groupId, date, records }, getToken());
+      }
       setDone(true);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return signOut();
@@ -161,12 +173,12 @@ export function AttendanceFormScreen({
     >
       <Dialog
         visible={done}
-        title="Chamada registrada"
+        title={attendanceId ? "Chamada atualizada" : "Chamada registrada"}
         message={`${group?.name ?? "Turma"} · ${date}: ${athletes.length - absent.size} presença(s) e ${absent.size} falta(s).`}
         onClose={navigation.goBack}
       />
       <Back onPress={navigation.goBack} />
-      <Heading title="NOVA CHAMADA" subtitle={group?.name} />
+      <Heading title={attendanceId ? "EDITAR CHAMADA" : "NOVA CHAMADA"} subtitle={group?.name} />
       <DateField label="Data da chamada" value={date} onChange={setDate} />
       <ErrorMessage message={error} />
       {loading ? (

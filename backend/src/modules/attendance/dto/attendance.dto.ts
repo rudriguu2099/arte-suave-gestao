@@ -38,6 +38,21 @@ export class AttendanceDto {
   records: AttendanceRecordDto[];
 }
 
+export class UpdateAttendanceDto {
+  @ApiPropertyOptional({ example: '20/10/2026', description: 'DD/MM/AAAA' })
+  @IsOptional()
+  @Matches(/^\d{2}\/\d{2}\/\d{4}$/, { message: 'date deve usar DD/MM/AAAA.' })
+  date?: string;
+
+  @ApiProperty({ type: [AttendanceRecordDto], description: 'Um registro por atleta ativo da turma' })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique((record: AttendanceRecordDto) => record.studentId, { message: 'Atleta repetido na chamada.' })
+  @ValidateNested({ each: true })
+  @Type(() => AttendanceRecordDto)
+  records: AttendanceRecordDto[];
+}
+
 export class AttendanceQueryDto {
   @ApiPropertyOptional({ example: 9, minimum: 1, maximum: 12, description: 'Mês de referência (1 a 12). Padrão: mês atual.' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(12) month?: number;

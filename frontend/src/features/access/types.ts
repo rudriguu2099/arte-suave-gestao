@@ -106,6 +106,6 @@ export type RootStackParamList = {
   Events: undefined;
   Students: { groupId?: string } | undefined;
   Attendance: undefined;
-  AttendanceForm: { groupId: string };
+  AttendanceForm: { groupId: string; attendanceId?: string };
   AttendanceHistory: { studentId?: string; groupId?: string };
 };
