@@ -223,7 +223,12 @@ export default function AtletasScreen({ navigation, route }: AtletasScreenProps)
                   title="Editar"
                   onPress={() => navigation.navigate("AccountForm", { athleteId: athlete.id })}
                 />
-                <Button compact secondary title="FREQ." onPress={() => console.log("Frequência", athlete.id)} />
+                <Button
+                  compact
+                  secondary
+                  title="FREQ."
+                  onPress={() => navigation.navigate("AttendanceHistory", { studentId: athlete.id })}
+                />
               </View>
             </View>
           ))
