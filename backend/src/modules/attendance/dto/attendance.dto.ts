@@ -22,3 +22,13 @@ export class AttendanceDto {
   @ValidateNested({ each: true }) @Type(() => AttendanceRecordDto)
   records: AttendanceRecordDto[];
 }
+
+export class AttendanceHistoryQueryDto {
+  @ApiProperty({ example: '01/10/2026', description: 'Início do período (DD/MM/AAAA)' })
+  @Matches(/^\d{2}\/\d{2}\/\d{4}$/, { message: 'from deve usar DD/MM/AAAA.' })
+  from: string;
+
+  @ApiProperty({ example: '31/10/2026', description: 'Fim do período, inclusivo (DD/MM/AAAA)' })
+  @Matches(/^\d{2}\/\d{2}\/\d{4}$/, { message: 'to deve usar DD/MM/AAAA.' })
+  to: string;
+}

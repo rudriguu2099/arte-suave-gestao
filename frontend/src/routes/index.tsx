@@ -7,6 +7,7 @@ import AccountFormScreen from "../screens/AccountFormScreen";
 import PasswordScreen from "../screens/PasswordScreen";
 import { EventsScreen } from "../screens/ReferenceScreens";
 import { AttendanceFormScreen, AttendanceScreen } from "../screens/AttendanceScreen";
+import AttendanceHistoryScreen from "../screens/AttendanceHistoryScreen";
 import { GroupFormScreen, GroupsScreen } from "../screens/GroupsScreen";
 import AtletasScreen from '../screens/AtletasScreen';
 import FinanceScreen from "../screens/FinanceScreen";
@@ -22,7 +23,7 @@ export default function Routes() {
   const { current } = useAccess();
   return (
     <NavigationContainer>
-      <Stack.Navigator 
+      <Stack.Navigator
         key={current ? current.id + "-" + current.role + "-" + current.isSuperAdmin : "guest"}
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#F3F3F3" } }}
       >
@@ -41,6 +42,7 @@ export default function Routes() {
                 <Stack.Screen name="Students" component={AtletasScreen} />
                 <Stack.Screen name="Attendance" component={AttendanceScreen} />
                 <Stack.Screen name="AttendanceForm" component={AttendanceFormScreen} />
+                <Stack.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} />
               </>
             )}
             {isSuperAdmin(current) && (
