@@ -1,6 +1,21 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsNotEmpty, IsString, IsUUID, Matches, MaxLength, ValidateNested } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 class AttendanceRecordDto {
   @ApiProperty({ format: 'uuid' })
@@ -21,6 +36,17 @@ export class AttendanceDto {
   @IsArray() @ArrayNotEmpty() @ArrayUnique((record: AttendanceRecordDto) => record.studentId, { message: 'Atleta repetido na chamada.' })
   @ValidateNested({ each: true }) @Type(() => AttendanceRecordDto)
   records: AttendanceRecordDto[];
+}
+
+export class AttendanceQueryDto {
+  @ApiPropertyOptional({ example: 9, minimum: 1, maximum: 12, description: 'Mês de referência (1 a 12). Padrão: mês atual.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(12) month?: number;
+
+  @ApiPropertyOptional({ example: 2026, minimum: 2000, maximum: 2100, description: 'Ano de referência. Padrão: ano atual.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(2000) @Max(2100) year?: number;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Filtra por um atleta específico vinculado ao usuário logado.' })
+  @IsOptional() @IsUUID() studentId?: string;
 }
 
 export class AttendanceHistoryQueryDto {

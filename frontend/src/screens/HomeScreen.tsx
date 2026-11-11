@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Action, ErrorMessage, colors, Page, Section, styles } from "../components/ui";
@@ -6,14 +7,77 @@ import { AdminFooter, EventCards } from "../components/access";
 import { useAccess } from "../features/access/AccessContext";
 import { ageOn, isStaff, isSuperAdmin } from "../features/access/domain";
 import { roleLabels, type RootStackParamList } from "../features/access/types";
+import { ApiError } from "../services/api";
+import { getMyAttendance, type AthleteMonthlyAttendance } from "../services/attendance";
+
+const monthNames = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
 
 export default function HomeScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, "Home">) {
-  const { current, signOut, athletes, accounts, groups, syncError } = useAccess();
-  if (!current) return null;
+  const { current, signOut, athletes, accounts, groups, syncError, getToken } = useAccess();
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  const [month, setMonth] = useState(currentMonth);
+  const [year, setYear] = useState(currentYear);
+  const [monthlyData, setMonthlyData] = useState<Record<string, AthleteMonthlyAttendance>>({});
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [attendanceError, setAttendanceError] = useState("");
+
   const admin = isStaff(current);
   const superadmin = isSuperAdmin(current);
+
+  const loadAttendance = useCallback(async () => {
+    if (!current || admin || !athletes.length) return;
+    setLoadingAttendance(true);
+    setAttendanceError("");
+    try {
+      const response = await getMyAttendance(getToken(), { month, year });
+      const map: Record<string, AthleteMonthlyAttendance> = {};
+      for (const item of response.athletes) {
+        map[item.studentId] = item;
+      }
+      setMonthlyData(map);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        signOut();
+        return;
+      }
+      setAttendanceError((e as Error).message);
+    } finally {
+      setLoadingAttendance(false);
+    }
+  }, [admin, athletes.length, current, getToken, month, signOut, year]);
+
+  useEffect(() => {
+    void loadAttendance();
+  }, [loadAttendance]);
+
+  if (!current) return null;
+
+  function changeMonth(delta: number) {
+    const next = new Date(year, month - 1 + delta, 1);
+    setMonth(next.getMonth() + 1);
+    setYear(next.getFullYear());
+  }
+
+  const isCurrentMonth = month === currentMonth && year === currentYear;
+
   return (
     <Page
       footer={
@@ -77,7 +141,7 @@ export default function HomeScreen({
           <MaterialIcons name="logout" size={15} color={colors.ink} />
         </Pressable>
       </View>
-      <ErrorMessage message={syncError} />
+      <ErrorMessage message={syncError || attendanceError} />
       {admin ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {[
@@ -113,17 +177,51 @@ export default function HomeScreen({
           ))}
         </View>
       ) : athletes.length ? (
-        athletes.map((athlete) => {
-          const group = groups.find((item) => item.id === athlete.groupId);
-          return (
-            <View key={athlete.id} style={{ gap: 22 }}>
-              <Section>
+        <>
+          <View style={[styles.row, { justifyContent: "space-between" }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mês anterior"
+              hitSlop={10}
+              onPress={() => changeMonth(-1)}
+              style={{ padding: 4 }}
+            >
+              <MaterialIcons name="chevron-left" size={20} color={colors.ink} />
+            </Pressable>
+            <Text style={[styles.text, { fontWeight: "700" }]}>
+              {monthNames[month - 1]} {year}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Próximo mês"
+              hitSlop={10}
+              onPress={() => changeMonth(1)}
+              style={{ padding: 4 }}
+            >
+              <MaterialIcons name="chevron-right" size={20} color={colors.ink} />
+            </Pressable>
+          </View>
+          {athletes.map((athlete) => {
+            const group = groups.find((item) => item.id === athlete.groupId);
+            const fetched = monthlyData[athlete.id];
+            const attendanceList = fetched
+              ? fetched.attendance
+              : isCurrentMonth
+                ? athlete.attendance
+                : [];
+            const records = fetched?.records ?? [];
+            const groupSubtitle = [group?.name, group?.level]
+              .filter(Boolean)
+              .join(" ");
+
+            return (
+              <Section key={athlete.id}>
                 <Text
                   style={[styles.label, { textDecorationLine: "underline" }]}
                 >
                   {current.role === "athlete"
-                    ? "Minha turma"
-                    : "Dependente vinculado"}
+                    ? "MINHA TURMA"
+                    : "DEPENDENTE VINCULADO"}
                 </Text>
                 <Text
                   style={[styles.text, { fontWeight: "700", fontSize: 16 }]}
@@ -134,57 +232,67 @@ export default function HomeScreen({
                 </Text>
                 <Text style={styles.muted}>
                   {current.role === "athlete"
-                    ? `${ageOn(athlete.birthDate)} anos · Faixa ${athlete.belt.toLowerCase()}`
-                    : group?.name}{" "}
-                  · {group?.schedule}
+                    ? `${ageOn(athlete.birthDate)} anos - Faixa ${athlete.belt.toLowerCase()}${group?.schedule ? ` - ${group.schedule}` : ""}`
+                    : [groupSubtitle || "Sem turma", group?.schedule]
+                        .filter(Boolean)
+                        .join(" - ")}
                 </Text>
-              </Section>
-              <Section>
+                <View
+                  style={{
+                    height: 1,
+                    backgroundColor: "#E5E5E5",
+                    marginVertical: 4,
+                  }}
+                />
                 <Text
                   style={[styles.label, { textDecorationLine: "underline" }]}
                 >
                   {current.role === "athlete"
-                    ? "Minha frequência"
-                    : `Frequência de ${athlete.name}`}{" "}
-
+                    ? `MINHA FREQUÊNCIA DE ${monthNames[month - 1]}`
+                    : `FREQUÊNCIA DO DEPENDENTE - ${monthNames[month - 1]}`}
                 </Text>
-                {athlete.attendance.length ? (
+                {loadingAttendance && !fetched ? (
+                  <ActivityIndicator color={colors.ink} style={{ alignSelf: "flex-start" }} />
+                ) : attendanceList.length ? (
                   <>
                     <View style={[styles.wrap, { maxWidth: 310 }]}>
-                      {athlete.attendance.map((present, index) => (
-                        <View
-                          key={index}
-                          accessibilityLabel={`Treino ${index + 1}: ${present ? "realizado" : "não realizado"}`}
-                          style={{
-                            width: 26,
-                            height: 26,
-                            backgroundColor: present ? "#111111" : colors.paper,
-                            borderWidth: 1,
-                            borderColor: "#E4E4E4",
-                            justifyContent: "center",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Text style={{ color: "white", fontSize: 10 }}>
-                            {present ? index + 1 : ""}
-                          </Text>
-                        </View>
-                      ))}
+                      {attendanceList.map((present, index) => {
+                        const dateLabel = records[index]?.date;
+                        return (
+                          <View
+                            key={index}
+                            accessibilityLabel={`Treino ${index + 1}${dateLabel ? ` (${dateLabel})` : ""}: ${present ? "realizado" : "não realizado"}`}
+                            style={{
+                              width: 26,
+                              height: 26,
+                              backgroundColor: present ? "#111111" : colors.paper,
+                              borderWidth: 1,
+                              borderColor: "#E4E4E4",
+                              justifyContent: "center",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Text style={{ color: "white", fontSize: 10 }}>
+                              {present ? index + 1 : ""}
+                            </Text>
+                          </View>
+                        );
+                      })}
                     </View>
                     <Text style={styles.muted}>
-                      {athlete.attendance.filter(Boolean).length}/
-                      {athlete.attendance.length} treinos realizados
+                      {attendanceList.filter(Boolean).length}/
+                      {attendanceList.length} Treinos realizados
                     </Text>
                   </>
                 ) : (
                   <Text style={styles.muted}>
-                    Nenhuma frequência registrada.
+                    Nenhuma frequência registrada em {monthNames[month - 1].toLowerCase()}.
                   </Text>
                 )}
               </Section>
-            </View>
-          );
-        })
+            );
+          })}
+        </>
       ) : (
         <Section>
           <Text style={styles.text}>Nenhum atleta vinculado à sua conta.</Text>
@@ -238,7 +346,7 @@ export default function HomeScreen({
           </>
         )}
         <Action
-          title="Alterar minha senha"
+          title={admin ? "Alterar minha senha" : "Redefinir senha"}
           onPress={() => navigation.navigate("Password")}
         />
       </View>

@@ -192,7 +192,7 @@ export default function CostAidScreen({
                   justifyContent: "center",
                 }}
               >
-                <MaterialIcons name="close" size={18} color={colors.paper} />
+                <MaterialIcons name="south-west" size={16} color={colors.paper} />
               </View>
             </Pressable>
           ))
@@ -227,7 +227,7 @@ export default function CostAidScreen({
                   justifyContent: "center",
                 }}
               >
-                <MaterialIcons name="check-circle-outline" size={18} color={colors.paper} />
+                <MaterialIcons name="north-east" size={16} color={colors.paper} />
               </View>
             </View>
           ))

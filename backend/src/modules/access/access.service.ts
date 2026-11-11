@@ -87,24 +87,50 @@ export class AccessService {
           : [current];
         // sessions é Json no Prisma; o formato é garantido pelo GroupsService.
         const allGroups = (await tx.schoolGroup.findMany({ orderBy: { name: 'asc' } })) as unknown as AccessGroup[];
+
+        // HU026 / HU027 / RF023: preenche a frequência do mês atual a partir de attendance_records.
+        const now = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' }) + 'T00:00:00Z');
+        const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+        const records =
+          students.length && tx.attendanceRecord
+            ? await tx.attendanceRecord.findMany({
+                where: {
+                  studentId: { in: students.map((student) => student.id) },
+                  attendance: { date: { gte: monthStart, lt: monthEnd } },
+                },
+                orderBy: { attendance: { date: 'asc' } },
+              })
+            : [];
+        const attendanceByStudent = new Map<string, boolean[]>();
+        for (const record of records) {
+          const list = attendanceByStudent.get(record.studentId) ?? [];
+          list.push(record.present);
+          attendanceByStudent.set(record.studentId, list);
+        }
+
         return {
           current: this.accountView(current, students),
           accounts: accounts.map((account) =>
             this.accountView(account, students),
           ),
-          athletes: students.map((student) => ({
-            id: student.id,
-            name: student.name,
-            birthDate: displayDate(student.birthDate),
-            emails: student.emails as string[],
-            phones: student.phones as string[],
-            groupId: student.groupId,
-            belt: student.belt,
-            attendance: student.attendance as boolean[],
-            active: student.active,
-            accountId: student.accountId ?? undefined,
-            guardianId: student.guardianId ?? undefined,
-          })),
+          athletes: students.map((student) => {
+            const monthly = attendanceByStudent.get(student.id);
+            const fallback = (student.attendance as boolean[]) ?? [];
+            return {
+              id: student.id,
+              name: student.name,
+              birthDate: displayDate(student.birthDate),
+              emails: student.emails as string[],
+              phones: student.phones as string[],
+              groupId: student.groupId,
+              belt: student.belt,
+              attendance: monthly?.length ? monthly : fallback,
+              active: student.active,
+              accountId: student.accountId ?? undefined,
+              guardianId: student.guardianId ?? undefined,
+            };
+          }),
           groups: staff
             ? allGroups
             : allGroups.filter((group) =>

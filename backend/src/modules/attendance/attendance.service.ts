@@ -1,8 +1,16 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Role } from '../../common/enums/role.enum.js';
 import { pgErrorCode, PrismaService } from '../../prisma/prisma.module.js';
 import { displayDate } from '../access/access.validation.js';
 import { parseDate } from '../finance/finance.service.js';
-import type { AttendanceDto, AttendanceHistoryQueryDto } from './dto/attendance.dto.js';
+import type { AttendanceDto, AttendanceHistoryQueryDto, AttendanceQueryDto } from './dto/attendance.dto.js';
 
 const today = () => new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' }) + 'T00:00:00Z');
 
@@ -39,6 +47,90 @@ export class AttendanceService {
       if (['P2002', '23505'].includes(pgErrorCode(error) ?? '')) throw new ConflictException('Já existe chamada desta turma nesta data.');
       throw error;
     }
+  }
+
+  // HU026 / HU027 / RF023: Atleta maior consulta a própria frequência; Responsável consulta a de cada dependente vinculado.
+  async findMine(actorId: string, query: AttendanceQueryDto = {}) {
+    const actor = await this.prisma.user.findFirst({ where: { id: actorId, deletedAt: null } });
+    if (!actor?.isActive) throw new UnauthorizedException('Conta indisponível.');
+
+    const now = today();
+    const month = query.month ?? now.getUTCMonth() + 1;
+    const year = query.year ?? now.getUTCFullYear();
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+
+    const where =
+      actor.role === Role.ADMINISTRADOR
+        ? query.studentId
+          ? { id: query.studentId }
+          : {}
+        : actor.role === Role.RESPONSAVEL
+          ? { guardianId: actor.id }
+          : { accountId: actor.id };
+
+    const ownedStudents = await this.prisma.student.findMany({
+      where,
+      orderBy: { name: 'asc' },
+    });
+
+    if (query.studentId) {
+      const target = ownedStudents.find((student) => student.id === query.studentId);
+      if (!target) {
+        if (actor.role === Role.ADMINISTRADOR) {
+          throw new NotFoundException('Atleta não encontrado.');
+        }
+        throw new ForbiddenException(
+          actor.role === Role.RESPONSAVEL
+            ? 'Você só pode consultar a frequência dos seus atletas dependentes vinculados.'
+            : 'Você só pode consultar a sua própria frequência.',
+        );
+      }
+    }
+
+    const students = query.studentId
+      ? ownedStudents.filter((student) => student.id === query.studentId)
+      : ownedStudents;
+
+    if (!students.length) {
+      return { month, year, athletes: [] };
+    }
+
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: {
+        studentId: { in: students.map((student) => student.id) },
+        attendance: { date: { gte: start, lt: end } },
+      },
+      include: { attendance: { select: { date: true } } },
+      orderBy: { attendance: { date: 'asc' } },
+    });
+
+    const byStudent = new Map<string, Array<{ date: string; present: boolean }>>();
+    for (const row of rows) {
+      const list = byStudent.get(row.studentId) ?? [];
+      list.push({ date: displayDate(row.attendance.date), present: row.present });
+      byStudent.set(row.studentId, list);
+    }
+
+    return {
+      month,
+      year,
+      athletes: students.map((student) => {
+        const records = byStudent.get(student.id) ?? [];
+        const attendance = records.map((record) => record.present);
+        const presentCount = attendance.filter(Boolean).length;
+        return {
+          studentId: student.id,
+          studentName: student.name,
+          groupId: student.groupId,
+          attendance,
+          records,
+          presentCount,
+          absentCount: attendance.length - presentCount,
+          totalSessions: attendance.length,
+        };
+      }),
+    };
   }
 
   // HU025 / RF022: presenças e faltas do atleta no período, chamadas mais recentes primeiro.
