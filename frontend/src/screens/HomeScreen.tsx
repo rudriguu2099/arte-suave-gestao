@@ -215,78 +215,81 @@ export default function HomeScreen({
               .join(" ");
 
             return (
-              <View key={athlete.id} style={{ gap: 22 }}>
-                <Section>
-                  <Text
-                    style={[styles.label, { textDecorationLine: "underline" }]}
-                  >
-                    {current.role === "athlete"
-                      ? "MINHA TURMA"
-                      : "DEPENDENTE VINCULADO"}
-                  </Text>
-                  <Text
-                    style={[styles.text, { fontWeight: "700", fontSize: 16 }]}
-                  >
-                    {current.role === "athlete"
-                      ? (group?.name ?? "Sem turma")
-                      : athlete.name}
-                  </Text>
-                  <Text style={styles.muted}>
-                    {current.role === "athlete"
-                      ? `${ageOn(athlete.birthDate)} anos - Faixa ${athlete.belt.toLowerCase()}${group?.schedule ? ` - ${group.schedule}` : ""}`
-                      : [groupSubtitle || "Sem turma", group?.schedule]
-                          .filter(Boolean)
-                          .join(" - ")}
-                  </Text>
-                </Section>
-                <Section>
-                  <Text
-                    style={[styles.label, { textDecorationLine: "underline" }]}
-                  >
-                    {current.role === "athlete"
-                      ? `MINHA FREQUÊNCIA DE ${monthNames[month - 1]}`
-                      : `FREQUÊNCIA DO DEPENDENTE - ${monthNames[month - 1]}`}
-                  </Text>
-                  {loadingAttendance && !fetched ? (
-                    <ActivityIndicator color={colors.ink} style={{ alignSelf: "flex-start" }} />
-                  ) : attendanceList.length ? (
-                    <>
-                      <View style={[styles.wrap, { maxWidth: 310 }]}>
-                        {attendanceList.map((present, index) => {
-                          const dateLabel = records[index]?.date;
-                          return (
-                            <View
-                              key={index}
-                              accessibilityLabel={`Treino ${index + 1}${dateLabel ? ` (${dateLabel})` : ""}: ${present ? "realizado" : "não realizado"}`}
-                              style={{
-                                width: 26,
-                                height: 26,
-                                backgroundColor: present ? "#111111" : colors.paper,
-                                borderWidth: 1,
-                                borderColor: "#E4E4E4",
-                                justifyContent: "center",
-                                alignItems: "center",
-                              }}
-                            >
-                              <Text style={{ color: "white", fontSize: 10 }}>
-                                {present ? index + 1 : ""}
-                              </Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-                      <Text style={styles.muted}>
-                        {attendanceList.filter(Boolean).length}/
-                        {attendanceList.length} Treinos realizados
-                      </Text>
-                    </>
-                  ) : (
+              <Section key={athlete.id}>
+                <Text
+                  style={[styles.label, { textDecorationLine: "underline" }]}
+                >
+                  {current.role === "athlete"
+                    ? "MINHA TURMA"
+                    : "DEPENDENTE VINCULADO"}
+                </Text>
+                <Text
+                  style={[styles.text, { fontWeight: "700", fontSize: 16 }]}
+                >
+                  {current.role === "athlete"
+                    ? (group?.name ?? "Sem turma")
+                    : athlete.name}
+                </Text>
+                <Text style={styles.muted}>
+                  {current.role === "athlete"
+                    ? `${ageOn(athlete.birthDate)} anos - Faixa ${athlete.belt.toLowerCase()}${group?.schedule ? ` - ${group.schedule}` : ""}`
+                    : [groupSubtitle || "Sem turma", group?.schedule]
+                        .filter(Boolean)
+                        .join(" - ")}
+                </Text>
+                <View
+                  style={{
+                    height: 1,
+                    backgroundColor: "#E5E5E5",
+                    marginVertical: 4,
+                  }}
+                />
+                <Text
+                  style={[styles.label, { textDecorationLine: "underline" }]}
+                >
+                  {current.role === "athlete"
+                    ? `MINHA FREQUÊNCIA DE ${monthNames[month - 1]}`
+                    : `FREQUÊNCIA DO DEPENDENTE - ${monthNames[month - 1]}`}
+                </Text>
+                {loadingAttendance && !fetched ? (
+                  <ActivityIndicator color={colors.ink} style={{ alignSelf: "flex-start" }} />
+                ) : attendanceList.length ? (
+                  <>
+                    <View style={[styles.wrap, { maxWidth: 310 }]}>
+                      {attendanceList.map((present, index) => {
+                        const dateLabel = records[index]?.date;
+                        return (
+                          <View
+                            key={index}
+                            accessibilityLabel={`Treino ${index + 1}${dateLabel ? ` (${dateLabel})` : ""}: ${present ? "realizado" : "não realizado"}`}
+                            style={{
+                              width: 26,
+                              height: 26,
+                              backgroundColor: present ? "#111111" : colors.paper,
+                              borderWidth: 1,
+                              borderColor: "#E4E4E4",
+                              justifyContent: "center",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Text style={{ color: "white", fontSize: 10 }}>
+                              {present ? index + 1 : ""}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
                     <Text style={styles.muted}>
-                      Nenhuma frequência registrada em {monthNames[month - 1].toLowerCase()}.
+                      {attendanceList.filter(Boolean).length}/
+                      {attendanceList.length} Treinos realizados
                     </Text>
-                  )}
-                </Section>
-              </View>
+                  </>
+                ) : (
+                  <Text style={styles.muted}>
+                    Nenhuma frequência registrada em {monthNames[month - 1].toLowerCase()}.
+                  </Text>
+                )}
+              </Section>
             );
           })}
         </>
