@@ -7,6 +7,19 @@ export type AttendanceInput = {
   records: { studentId: string; present: boolean }[];
 };
 
+// HU024 / RF021: consulta e edição de chamada registrada anteriormente.
+export type AttendanceDetail = {
+  id: string;
+  groupId: string;
+  date: string;
+  records: { studentId: string; present: boolean }[];
+};
+
+export type UpdateAttendanceInput = {
+  date?: string;
+  records: { studentId: string; present: boolean }[];
+};
+
 // HU026 / HU027 / RF023: frequência mensal do próprio atleta ou de cada dependente vinculado.
 export type AthleteMonthlyAttendance = {
   studentId: string;
@@ -47,6 +60,14 @@ export type GroupAttendanceHistory = {
 
 export function createAttendance(input: AttendanceInput, token: string) {
   return api.post<{ id: string }>("/attendances", input, token);
+}
+
+export function getAttendance(id: string, token: string) {
+  return api.get<AttendanceDetail>(`/attendances/${encodeURIComponent(id)}`, token);
+}
+
+export function updateAttendance(id: string, input: UpdateAttendanceInput, token: string) {
+  return api.patch<AttendanceDetail>(`/attendances/${encodeURIComponent(id)}`, input, token);
 }
 
 export function getMyAttendance(

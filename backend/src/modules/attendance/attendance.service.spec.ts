@@ -17,7 +17,12 @@ describe('AttendanceService', () => {
     user: { findFirst: ReturnType<typeof vi.fn> };
     schoolGroup: { findUnique: ReturnType<typeof vi.fn> };
     student: { count: ReturnType<typeof vi.fn>; findUnique: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
-    attendance: { create: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
+    attendance: {
+      create: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+    };
     attendanceRecord: { findMany: ReturnType<typeof vi.fn>; groupBy: ReturnType<typeof vi.fn> };
   };
 
@@ -39,7 +44,11 @@ describe('AttendanceService', () => {
       },
       attendance: {
         create: vi.fn(({ data }) => Promise.resolve({ id: 'a1', ...data, records: data.records.create })),
+        findUnique: vi.fn().mockResolvedValue({ id: 'a1', groupId: 'turma-1', date: new Date('2026-10-20T00:00:00Z'), records }),
         findMany: vi.fn().mockResolvedValue([]),
+        update: vi.fn(({ where, data }) =>
+          Promise.resolve({ id: where.id, groupId: 'turma-1', date: data.date, records: data.records.create }),
+        ),
       },
       attendanceRecord: { findMany: vi.fn().mockResolvedValue([]), groupBy: vi.fn().mockResolvedValue([]) },
     };
@@ -85,6 +94,73 @@ describe('AttendanceService', () => {
     it('recusa segunda chamada da turma na mesma data', async () => {
       prisma.attendance.create.mockRejectedValue(Object.assign(new Error('unique'), { code: 'P2002' }));
       await expect(service.create(dto)).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('findOne e update (HU024 / RF021)', () => {
+    const correctedRecords = [
+      { studentId: '11111111-1111-4111-8111-111111111111', present: false },
+      { studentId: '22222222-2222-4222-8222-222222222222', present: true },
+    ];
+
+    it('consulta uma chamada existente com data em DD/MM/AAAA', async () => {
+      const result = await service.findOne('a1');
+
+      expect(prisma.attendance.findUnique).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        include: { records: true },
+      });
+      expect(result).toMatchObject({ id: 'a1', groupId: 'turma-1', date: '20/10/2026', records });
+    });
+
+    it('recusa consulta de chamada inexistente', async () => {
+      prisma.attendance.findUnique.mockResolvedValue(null);
+      await expect(service.findOne('a1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('corrige o registro de presença dos atletas de uma chamada anterior', async () => {
+      const result = await service.update('a1', { date: '20/10/2026', records: correctedRecords });
+
+      expect(prisma.student.count).toHaveBeenCalledWith({
+        where: { id: { in: correctedRecords.map((r) => r.studentId) }, groupId: 'turma-1', active: true },
+      });
+      expect(prisma.attendance.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: {
+          date: new Date('2026-10-20T00:00:00Z'),
+          records: { deleteMany: {}, create: correctedRecords },
+        },
+        include: { records: true },
+      });
+      expect(result).toMatchObject({ id: 'a1', date: '20/10/2026', records: correctedRecords });
+    });
+
+    it('mantém a data original quando date não é enviada no update', async () => {
+      const result = await service.update('a1', { records: correctedRecords });
+
+      expect(result).toMatchObject({ id: 'a1', date: '20/10/2026', records: correctedRecords });
+    });
+
+    it('recusa edição de chamada inexistente', async () => {
+      prisma.attendance.findUnique.mockResolvedValue(null);
+      await expect(service.update('a1', { records: correctedRecords })).rejects.toThrow(NotFoundException);
+      expect(prisma.attendance.update).not.toHaveBeenCalled();
+    });
+
+    it('recusa data futura na edição', async () => {
+      await expect(service.update('a1', { date: '07/11/2026', records: correctedRecords })).rejects.toThrow(BadRequestException);
+      expect(prisma.attendance.update).not.toHaveBeenCalled();
+    });
+
+    it('recusa atleta inativo ou de outra turma na edição', async () => {
+      prisma.student.count.mockResolvedValue(1);
+      await expect(service.update('a1', { records: correctedRecords })).rejects.toThrow(BadRequestException);
+      expect(prisma.attendance.update).not.toHaveBeenCalled();
+    });
+
+    it('recusa conflito de data com outra chamada da mesma turma', async () => {
+      prisma.attendance.update.mockRejectedValue(Object.assign(new Error('unique'), { code: 'P2002' }));
+      await expect(service.update('a1', { date: '19/10/2026', records: correctedRecords })).rejects.toThrow(ConflictException);
     });
   });
 

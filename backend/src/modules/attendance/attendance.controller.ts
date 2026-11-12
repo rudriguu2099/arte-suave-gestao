@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -8,6 +8,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -17,7 +18,7 @@ import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import type { JwtPayload } from '../auth/auth.service.js';
 import { AttendanceService } from './attendance.service.js';
-import { AttendanceDto, AttendanceHistoryQueryDto, AttendanceQueryDto } from './dto/attendance.dto.js';
+import { AttendanceDto, AttendanceHistoryQueryDto, AttendanceQueryDto, UpdateAttendanceDto } from './dto/attendance.dto.js';
 
 @ApiTags('attendances')
 @ApiBearerAuth()
@@ -82,5 +83,33 @@ export class AttendanceController {
   @Roles(Role.ADMINISTRADOR)
   historyByGroup(@Param('groupId') groupId: string, @Query() query: AttendanceHistoryQueryDto) {
     return this.service.historyByGroup(groupId, query);
+  }
+
+  @ApiOperation({ summary: 'Consulta uma chamada pelo id para edição (HU024 / RF021)' })
+  @ApiParam({ name: 'id', description: 'id da chamada' })
+  @ApiOkResponse({ description: 'Chamada com data em DD/MM/AAAA e registros de presença por atleta' })
+  @ApiBadRequestResponse({ description: 'Id inválido' })
+  @ApiForbiddenResponse({ description: 'Somente administradores consultam a chamada' })
+  @ApiNotFoundResponse({ description: 'Chamada não encontrada' })
+  @Get(':id')
+  @Roles(Role.ADMINISTRADOR)
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.findOne(id);
+  }
+
+  @ApiOperation({
+    summary: 'Corrige o registro de presença de uma chamada anterior (HU024 / RF021)',
+    description: 'Substitui os registros de presença da chamada e atualiza a frequência dos atletas.',
+  })
+  @ApiParam({ name: 'id', description: 'id da chamada' })
+  @ApiOkResponse({ description: 'Chamada atualizada, com data em DD/MM/AAAA' })
+  @ApiBadRequestResponse({ description: 'Dados inválidos, data futura ou atleta fora da turma/inativo' })
+  @ApiForbiddenResponse({ description: 'Somente administradores editam a chamada' })
+  @ApiNotFoundResponse({ description: 'Chamada não encontrada' })
+  @ApiConflictResponse({ description: 'Já existe chamada desta turma nesta data' })
+  @Patch(':id')
+  @Roles(Role.ADMINISTRADOR)
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateAttendanceDto) {
+    return this.service.update(id, dto);
   }
 }
