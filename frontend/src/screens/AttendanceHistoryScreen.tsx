@@ -140,9 +140,6 @@ export default function AttendanceHistoryScreen({
                       </Text>
                       <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
                     </View>
-                    <Text style={[styles.muted, { fontSize: 11 }]}>
-                      {attendance.presences + attendance.absences} atleta(s) na chamada
-                    </Text>
                     <View style={styles.wrap}>
                       <Pill tone="ok" text={`${attendance.presences} PRES.`} />
                       <Pill tone="bad" text={`${attendance.absences} FALT.`} />
