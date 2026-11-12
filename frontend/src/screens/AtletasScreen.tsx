@@ -107,6 +107,26 @@ export default function AtletasScreen({ navigation, route }: AtletasScreenProps)
 
       <Heading title="ATLETAS" subtitle={lockedGroup ? lockedGroup.name : "Visualização, busca e filtros"} />
 
+      {lockedGroup && (
+        <View style={[globalStyles.row, { marginTop: 12 }]}>
+          {lockedGroup.active && (
+            <View style={{ flex: 1 }}>
+              <Button
+                title="REALIZAR CHAMADA"
+                onPress={() => navigation.navigate("AttendanceForm", { groupId: lockedGroup.id })}
+              />
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Button
+              title="HISTÓRICO"
+              secondary
+              onPress={() => navigation.navigate("AttendanceHistory", { groupId: lockedGroup.id })}
+            />
+          </View>
+        </View>
+      )}
+
       {/* Área de Filtros */}
       <View style={{ marginTop: 16, gap: 12 }}>
         <Field
