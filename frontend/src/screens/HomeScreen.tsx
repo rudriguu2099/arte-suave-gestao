@@ -340,7 +340,7 @@ export default function HomeScreen({
               onPress={() => navigation.navigate("Groups")}
             />
             <Action
-              title="Consultar frequência"
+              title="Frequência"
               onPress={() => navigation.navigate("Attendance")}
             />
           </>
