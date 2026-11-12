@@ -119,8 +119,6 @@ export default function AttendanceHistoryScreen({
             <>
               <View style={styles.row}>
                 <Total label="CHAMADAS" value={group.totals.sessions} />
-                <Total label="PRESENÇAS" value={group.totals.presences} color={tones.ok.color} />
-                <Total label="FALTAS" value={group.totals.absences} color={tones.bad.color} />
               </View>
               <Text style={[styles.label, { color: colors.muted }]}>TODAS AS CHAMADAS</Text>
               {group.attendances.map((attendance) => (
