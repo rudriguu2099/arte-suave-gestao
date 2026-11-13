@@ -120,10 +120,11 @@ export default function AtletasScreen({ navigation, route }: AtletasScreenProps)
       <Heading title="ATLETAS" subtitle={lockedGroup ? lockedGroup.name : "Visualização, busca e filtros"} />
 
       {lockedGroup && (
-        <View style={[globalStyles.row, { marginTop: 12 }]}>
+        <View style={[globalStyles.row, { marginTop: 12, alignItems: "stretch" }]}>
           {lockedGroup.active && (
             <View style={{ flex: 1 }}>
               <Button
+                style={{ flex: 1 }}
                 title="REALIZAR CHAMADA"
                 onPress={() => navigation.navigate("AttendanceForm", { groupId: lockedGroup.id })}
               />
@@ -131,6 +132,7 @@ export default function AtletasScreen({ navigation, route }: AtletasScreenProps)
           )}
           <View style={{ flex: 1 }}>
             <Button
+              style={{ flex: 1 }}
               title="HISTÓRICO"
               secondary
               onPress={() => navigation.navigate("AttendanceHistory", { groupId: lockedGroup.id })}
