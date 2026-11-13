@@ -16,10 +16,16 @@ import {
   styles,
 } from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
-import { isStaff } from "../features/access/domain";
+import { isStaff, parseBirthDate } from "../features/access/domain";
 import { weekdayLabels, type RootStackParamList } from "../features/access/types";
 import { ApiError } from "../services/api";
-import { createAttendance, getAttendance, updateAttendance } from "../services/attendance";
+import {
+  createAttendance,
+  getAttendance,
+  getGroupAttendance,
+  updateAttendance,
+  type AttendanceDetail,
+} from "../services/attendance";
 import { getStudents, type Student } from "../services/students";
 
 // Turmas ativas; cada uma abre a chamada do dia (HU023 / RF020).
@@ -96,23 +102,36 @@ export function AttendanceFormScreen({
   const { groups, current, getToken, signOut } = useAccess();
   const { groupId, attendanceId } = route.params;
   const group = groups.find((item) => item.id === groupId);
+  const [editingId, setEditingId] = useState<string | undefined>(attendanceId);
   const [date, setDate] = useState(new Date().toLocaleDateString("pt-BR"));
   const [athletes, setAthletes] = useState<Student[]>([]);
   const [absent, setAbsent] = useState<Set<string>>(new Set());
+  const [initialAbsent, setInitialAbsent] = useState<Set<string>>(new Set());
+  const [pendingExisting, setPendingExisting] = useState<AttendanceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const submitted = useRef(false);
+  const checkedDateRef = useRef<string>("");
+
+  function applyAttendanceRecords(attendance: AttendanceDetail) {
+    const absentSet = new Set(attendance.records.filter((r) => !r.present).map((r) => r.studentId));
+    setInitialAbsent(new Set(absentSet));
+    setAbsent(absentSet);
+  }
 
   useEffect(() => {
     const token = getToken();
+    setLoading(true);
     const load = attendanceId
       ? Promise.all([getStudents({ groupId, active: true }, token), getAttendance(attendanceId, token)]).then(
           ([students, attendance]) => {
+            checkedDateRef.current = attendance.date;
+            setEditingId(attendance.id);
             setDate(attendance.date);
             setAthletes(students);
-            setAbsent(new Set(attendance.records.filter((r) => !r.present).map((r) => r.studentId)));
+            applyAttendanceRecords(attendance);
           },
         )
       : getStudents({ groupId, active: true }, token).then(setAthletes);
@@ -125,7 +144,54 @@ export function AttendanceFormScreen({
       .finally(() => setLoading(false));
   }, [groupId, attendanceId]);
 
+  useEffect(() => {
+    if (!parseBirthDate(date) || checkedDateRef.current === date) return;
+    let cancelled = false;
+    const token = getToken();
+    checkedDateRef.current = date;
+
+    getGroupAttendance(groupId, { from: date, to: date }, token)
+      .then(async (history) => {
+        if (cancelled) return;
+        const existing = history.attendances[0];
+        if (existing) {
+          const detail = await getAttendance(existing.id, token);
+          if (cancelled) return;
+          applyAttendanceRecords(detail);
+          if (editingId === detail.id) return;
+          setPendingExisting(detail);
+        } else if (!attendanceId) {
+          setEditingId(undefined);
+          setInitialAbsent(new Set());
+          setAbsent(new Set());
+          setPendingExisting(null);
+          setError("");
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        if (e instanceof ApiError && e.status === 401) return signOut();
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, date, attendanceId, editingId]);
+
   if (!isStaff(current)) return null;
+
+  function confirmEditExisting() {
+    if (!pendingExisting) return;
+    setEditingId(pendingExisting.id);
+    applyAttendanceRecords(pendingExisting);
+    setPendingExisting(null);
+    setError("");
+  }
+
+  function cancelEditExisting() {
+    setPendingExisting(null);
+    setError("Já existe chamada desta turma nesta data. Altere a data ou edite a chamada existente.");
+  }
 
   function toggle(id: string, present: boolean) {
     setAbsent((previous) => {
@@ -144,8 +210,8 @@ export function AttendanceFormScreen({
     setError("");
     const records = athletes.map((a) => ({ studentId: a.id, present: !absent.has(a.id) }));
     try {
-      if (attendanceId) {
-        await updateAttendance(attendanceId, { date, records }, getToken());
+      if (editingId) {
+        await updateAttendance(editingId, { date, records }, getToken());
       } else {
         await createAttendance({ groupId, date, records }, getToken());
       }
@@ -164,7 +230,7 @@ export function AttendanceFormScreen({
       footer={
         <View style={{ padding: 16, backgroundColor: colors.paper }}>
           <Button
-            title={saving ? "SALVANDO..." : "SALVAR CHAMADA"}
+            title={saving ? "SALVANDO..." : editingId ? "ATUALIZAR CHAMADA" : "SALVAR CHAMADA"}
             disabled={saving || loading || !athletes.length}
             onPress={save}
           />
@@ -172,13 +238,25 @@ export function AttendanceFormScreen({
       }
     >
       <Dialog
+        visible={!!pendingExisting}
+        title="Chamada já registrada"
+        message={
+          pendingExisting
+            ? `Já existe uma chamada lançada para ${group?.name ?? "esta turma"} em ${pendingExisting.date}. Deseja editá-la?`
+            : ""
+        }
+        confirmLabel="EDITAR CHAMADA"
+        onConfirm={confirmEditExisting}
+        onClose={cancelEditExisting}
+      />
+      <Dialog
         visible={done}
-        title={attendanceId ? "Chamada atualizada" : "Chamada registrada"}
+        title={editingId ? "Chamada atualizada" : "Chamada registrada"}
         message={`${group?.name ?? "Turma"} · ${date}: ${athletes.length - absent.size} presença(s) e ${absent.size} falta(s).`}
         onClose={navigation.goBack}
       />
       <Back onPress={navigation.goBack} />
-      <Heading title={attendanceId ? "EDITAR CHAMADA" : "NOVA CHAMADA"} subtitle={group?.name} />
+      <Heading title={editingId ? "EDITAR CHAMADA" : "NOVA CHAMADA"} subtitle={group?.name} />
       <DateField label="Data da chamada" value={date} onChange={setDate} />
       <ErrorMessage message={error} />
       {loading ? (
@@ -187,12 +265,15 @@ export function AttendanceFormScreen({
         <View style={{ gap: 10 }}>
           {athletes.map((athlete) => {
             const present = !absent.has(athlete.id);
+            const wasAbsentInSaved = initialAbsent.has(athlete.id);
+            const baseAbsences = Math.max(0, athlete.absenceCount - (wasAbsentInSaved ? 1 : 0));
+            const displayedAbsences = baseAbsences + (present ? 0 : 1);
             return (
               <Section key={athlete.id}>
                 <View style={styles.row}>
                   <Text style={[styles.text, { flex: 1 }]}>{athlete.name}</Text>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={styles.text}>{athlete.absenceCount}</Text>
+                    <Text style={styles.text}>{displayedAbsences}</Text>
                     <Text style={[styles.muted, { fontSize: 10 }]}>faltas</Text>
                   </View>
                   <Switch

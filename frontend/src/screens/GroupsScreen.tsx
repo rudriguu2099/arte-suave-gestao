@@ -111,6 +111,13 @@ export function GroupsScreen({
                 {!group.active && <Text style={styles.label}>Turma inativa</Text>}
                 </Pressable>
               <View style={{ gap: 8 }}>
+                {group.active && (
+                  <Button
+                    title="CHAMADA"
+                    compact
+                    onPress={() => navigation.navigate("AttendanceForm", { groupId: group.id })}
+                  />
+                )}
                 <Button
                   title="EDITAR"
                   compact
