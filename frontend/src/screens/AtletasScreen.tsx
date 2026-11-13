@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
@@ -69,35 +69,47 @@ export default function AtletasScreen({ navigation, route }: AtletasScreenProps)
   );
 
   useEffect(() => {
-    let cancelled = false;
+    setGroupId(route.params?.groupId ?? "");
+  }, [route.params?.groupId]);
 
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await getStudents(
-          {
-            search: search.trim() || undefined,
-            groupId: groupId || undefined,
-            active: active === "" ? undefined : active === "true",
-          },
-          getToken(),
-        );
-        if (!cancelled) setAthletes(data);
-      } catch (e) {
-        if (cancelled) return;
-        if (e instanceof ApiError && e.status === 401) signOut();
-        else setError(e instanceof Error ? e.message : "Não foi possível carregar os atletas.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const effectiveGroupId = lockedGroupId ?? groupId;
+
+  const loadAthletes = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getStudents(
+        {
+          search: search.trim() || undefined,
+          groupId: effectiveGroupId || undefined,
+          active: active === "" ? undefined : active === "true",
+        },
+        getToken(),
+      );
+      setAthletes(data);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) signOut();
+      else setError(e instanceof Error ? e.message : "Não foi possível carregar os atletas.");
+    } finally {
+      setLoading(false);
+    }
+  }, [search, effectiveGroupId, active, getToken, signOut]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void loadAthletes();
     }, 300);
 
     return () => {
-      cancelled = true;
       clearTimeout(timer);
     };
-  }, [search, groupId, active]);
+  }, [loadAthletes]);
+
+  useEffect(() => {
+    return navigation.addListener("focus", () => {
+      void loadAthletes();
+    });
+  }, [navigation, loadAthletes]);
 
   return (
     <Page
@@ -106,6 +118,28 @@ export default function AtletasScreen({ navigation, route }: AtletasScreenProps)
       <Back onPress={() => navigation.goBack()} />
 
       <Heading title="ATLETAS" subtitle={lockedGroup ? lockedGroup.name : "Visualização, busca e filtros"} />
+
+      {lockedGroup && (
+        <View style={[globalStyles.row, { marginTop: 12, alignItems: "stretch" }]}>
+          {lockedGroup.active && (
+            <View style={{ flex: 1 }}>
+              <Button
+                style={{ flex: 1 }}
+                title="REALIZAR CHAMADA"
+                onPress={() => navigation.navigate("AttendanceForm", { groupId: lockedGroup.id })}
+              />
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Button
+              style={{ flex: 1 }}
+              title="HISTÓRICO"
+              secondary
+              onPress={() => navigation.navigate("AttendanceHistory", { groupId: lockedGroup.id })}
+            />
+          </View>
+        </View>
+      )}
 
       {/* Área de Filtros */}
       <View style={{ marginTop: 16, gap: 12 }}>

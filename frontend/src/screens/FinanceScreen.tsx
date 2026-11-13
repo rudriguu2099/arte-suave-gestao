@@ -191,6 +191,12 @@ export default function FinanceScreen({
   const maxHistory = Math.max(...data.history.flatMap((point) => [point.revenues, point.expenses]), 1);
   const maxAbsBalance = Math.max(...data.history.map((point) => Math.abs(point.balance)), 1);
   const maxCategoryExpense = Math.max(...data.expensesByCategory.map((item) => item.total), 1);
+  const hasHistoryData = data.history.some((point) => point.revenues > 0 || point.expenses > 0);
+
+  function selectHistoryMonth(targetMonth: number, targetYear: number) {
+    setMonth(targetMonth);
+    setYear(targetYear);
+  }
 
   const filteredEntries = (applied ? historyEntries : data.entries).filter((entry) => {
     if (filter === "revenues") return entry.kind === "revenue";
@@ -309,42 +315,63 @@ export default function FinanceScreen({
               paddingTop: 8,
               borderBottomWidth: 1,
               borderColor: "#EFEFEF",
+              position: "relative",
             }}
           >
+            {!hasHistoryData && (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={[styles.muted, { fontSize: 12 }]}>Sem movimentações nos últimos 6 meses.</Text>
+              </View>
+            )}
             {data.history.map((point) => {
               const expHeight =
-                point.expenses > 0 ? Math.max(5, Math.round((point.expenses / maxHistory) * 96)) : 2;
+                point.expenses > 0 ? Math.max(5, Math.round((point.expenses / maxHistory) * 96)) : 0;
               const revHeight =
-                point.revenues > 0 ? Math.max(5, Math.round((point.revenues / maxHistory) * 96)) : 2;
+                point.revenues > 0 ? Math.max(5, Math.round((point.revenues / maxHistory) * 96)) : 0;
               return (
-                <View
+                <Pressable
                   key={`${point.year}-${point.month}`}
+                  accessibilityRole="button"
                   accessibilityLabel={`${shortMonths[point.month - 1]} ${point.year}: receitas ${formatarReais(point.revenues)}, despesas ${formatarReais(point.expenses)}`}
-                  style={{ flex: 1, alignItems: "center", justifyContent: "flex-end" }}
+                  onPress={() => selectHistoryMonth(point.month, point.year)}
+                  style={{ flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end" }}
                 >
                   <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 3 }}>
-                    <View
-                      style={{
-                        width: 11,
-                        height: expHeight,
-                        backgroundColor: palette.red,
-                        borderTopLeftRadius: 2,
-                        borderTopRightRadius: 2,
-                        opacity: point.expenses > 0 ? 1 : 0.25,
-                      }}
-                    />
-                    <View
-                      style={{
-                        width: 11,
-                        height: revHeight,
-                        backgroundColor: palette.chartGreen,
-                        borderTopLeftRadius: 2,
-                        borderTopRightRadius: 2,
-                        opacity: point.revenues > 0 ? 1 : 0.25,
-                      }}
-                    />
+                    {expHeight > 0 && (
+                      <View
+                        style={{
+                          width: 11,
+                          height: expHeight,
+                          backgroundColor: palette.red,
+                          borderTopLeftRadius: 2,
+                          borderTopRightRadius: 2,
+                        }}
+                      />
+                    )}
+                    {revHeight > 0 && (
+                      <View
+                        style={{
+                          width: 11,
+                          height: revHeight,
+                          backgroundColor: palette.chartGreen,
+                          borderTopLeftRadius: 2,
+                          borderTopRightRadius: 2,
+                        }}
+                      />
+                    )}
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -352,18 +379,23 @@ export default function FinanceScreen({
             {data.history.map((point) => {
               const selected = point.month === month && point.year === year;
               return (
-                <Text
+                <Pressable
                   key={`lbl-${point.year}-${point.month}`}
-                  style={{
-                    flex: 1,
-                    textAlign: "center",
-                    fontSize: 10,
-                    color: selected ? colors.ink : colors.muted,
-                    fontWeight: selected ? "700" : "400",
-                  }}
+                  accessibilityRole="button"
+                  onPress={() => selectHistoryMonth(point.month, point.year)}
+                  style={{ flex: 1 }}
                 >
-                  {shortMonths[point.month - 1]}
-                </Text>
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      fontSize: 10,
+                      color: selected ? colors.ink : colors.muted,
+                      fontWeight: selected ? "700" : "400",
+                    }}
+                  >
+                    {shortMonths[point.month - 1]}
+                  </Text>
+                </Pressable>
               );
             })}
           </View>
@@ -382,19 +414,38 @@ export default function FinanceScreen({
         {/* Gráfico 2 (RF016): Gráfico de Barras do Saldo Mensal (6 Meses) */}
         <View style={[styles.card, { padding: 16, gap: 10 }]}>
           <Text style={[styles.label, { color: colors.muted, fontWeight: "700" }]}>SALDO — 6 MESES</Text>
-          <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-around", position: "relative" }}>
+            {!hasHistoryData && (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 18,
+                  left: 0,
+                  right: 0,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
+                }}
+              >
+                <Text style={[styles.muted, { fontSize: 12 }]}>Sem movimentações nos últimos 6 meses.</Text>
+              </View>
+            )}
             {data.history.map((point) => {
               const barHeight =
                 point.balance !== 0
                   ? Math.max(5, Math.round((Math.abs(point.balance) / maxAbsBalance) * 44))
-                  : 2;
+                  : 0;
               const positive = point.balance > 0;
               const negative = point.balance < 0;
               const selected = point.month === month && point.year === year;
               return (
-                <View
+                <Pressable
                   key={`bal-${point.year}-${point.month}`}
+                  accessibilityRole="button"
                   accessibilityLabel={`Saldo ${shortMonths[point.month - 1]} ${point.year}: ${formatarReais(point.balance)}`}
+                  onPress={() => selectHistoryMonth(point.month, point.year)}
                   style={{ flex: 1, alignItems: "center" }}
                 >
                   <View style={{ height: 46, justifyContent: "flex-end", alignItems: "center", width: "100%" }}>
@@ -408,9 +459,6 @@ export default function FinanceScreen({
                           borderTopRightRadius: 2,
                         }}
                       />
-                    )}
-                    {point.balance === 0 && (
-                      <View style={{ width: 18, height: 2, backgroundColor: colors.border }} />
                     )}
                   </View>
                   <View style={{ height: 1, width: "100%", backgroundColor: "#DDDDDD" }} />
@@ -437,7 +485,7 @@ export default function FinanceScreen({
                   >
                     {shortMonths[point.month - 1]}
                   </Text>
-                </View>
+                </Pressable>
               );
             })}
           </View>
