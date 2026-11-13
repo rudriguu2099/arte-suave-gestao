@@ -157,9 +157,11 @@ export function AttendanceFormScreen({
         if (existing) {
           const detail = await getAttendance(existing.id, token);
           if (cancelled) return;
+          const alreadyEditingThis = editingId === detail.id;
+          setEditingId(detail.id);
           applyAttendanceRecords(detail);
-          if (editingId === detail.id) return;
-          setPendingExisting(detail);
+          setError("");
+          if (!alreadyEditingThis) setPendingExisting(detail);
         } else if (!attendanceId) {
           setEditingId(undefined);
           setInitialAbsent(new Set());
@@ -179,19 +181,6 @@ export function AttendanceFormScreen({
   }, [groupId, date, attendanceId, editingId]);
 
   if (!isStaff(current)) return null;
-
-  function confirmEditExisting() {
-    if (!pendingExisting) return;
-    setEditingId(pendingExisting.id);
-    applyAttendanceRecords(pendingExisting);
-    setPendingExisting(null);
-    setError("");
-  }
-
-  function cancelEditExisting() {
-    setPendingExisting(null);
-    setError("Já existe chamada desta turma nesta data. Altere a data ou edite a chamada existente.");
-  }
 
   function toggle(id: string, present: boolean) {
     setAbsent((previous) => {
@@ -242,12 +231,11 @@ export function AttendanceFormScreen({
         title="Chamada já registrada"
         message={
           pendingExisting
-            ? `Já existe uma chamada lançada para ${group?.name ?? "esta turma"} em ${pendingExisting.date}. Deseja editá-la?`
+            ? `Já existe uma chamada lançada para ${group?.name ?? "esta turma"} em ${pendingExisting.date}. Você pode editá-la abaixo ou selecionar outra data para lançar uma nova chamada.`
             : ""
         }
-        confirmLabel="EDITAR CHAMADA"
-        onConfirm={confirmEditExisting}
-        onClose={cancelEditExisting}
+        confirmLabel="ENTENDI"
+        onClose={() => setPendingExisting(null)}
       />
       <Dialog
         visible={done}

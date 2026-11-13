@@ -10,7 +10,9 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -210,12 +212,14 @@ export function Button({
   secondary,
   disabled,
   compact,
+  style,
 }: {
   title: string;
   onPress: () => void;
   secondary?: boolean;
   disabled?: boolean;
   compact?: boolean;
+  style?: StyleProp<ViewStyle>;
 }) {
   return (
     <Pressable
@@ -230,6 +234,7 @@ export function Button({
           borderColor: colors.border,
         },
         compact && { paddingHorizontal: 10 },
+        style,
         { opacity: disabled ? 0.45 : pressed ? 0.7 : 1 },
       ]}
     >
