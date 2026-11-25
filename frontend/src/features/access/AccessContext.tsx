@@ -10,6 +10,7 @@ import {
 import { AppState } from "react-native";
 import { accessApi, type AccessState } from "../../services/accessApi";
 import { ApiError } from "../../services/api";
+import { syncCostAidReminder } from "../../services/costAidReminder";
 import { canChangePassword, requireManageProfile, validateNewPassword, validateContacts, ageOn } from "./domain";
 import { findProfile } from "./profiles";
 import { validarTurma } from "../../utils/validators";
@@ -71,6 +72,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     epoch.current++;
     token.current = null;
+    void syncCostAidReminder(null);
     setData(empty);
     setSyncError("");
     setSessionMessage("");
@@ -103,10 +105,18 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
   async function login(email: string, password: string) {
     const generation = ++epoch.current;
-    const credentials = await accessApi.login(email, password);
+    let credentials;
+    try {
+      credentials = await accessApi.login(email, password);
+    } catch (error) {
+      // Login recusado (inclusive conta inativa): o aparelho deixa de lembrar a ajuda de custo.
+      if (error instanceof ApiError && error.status === 401) void syncCostAidReminder(null);
+      throw error;
+    }
     const next = await accessApi.state(credentials.accessToken);
     if (generation === epoch.current) {
       token.current = credentials.accessToken;
+      void syncCostAidReminder(next.current);
       setData(next);
       setSyncError("");
       setSessionMessage("");

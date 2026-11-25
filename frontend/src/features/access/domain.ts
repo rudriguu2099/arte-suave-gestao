@@ -137,3 +137,23 @@ export function canChangePassword(
   return !!actor?.active && (actor.id === accountId || isSuperAdmin(actor) ||
     (targetRole !== undefined && canManageProfile(actor, targetRole)));
 }
+
+const costAidMessages = [
+  {
+    hour: 9,
+    title: "Ajude o projeto a continuar 🥋",
+    body: "O período de contribuição da ajuda de custo vai do dia 5 ao dia 10. Sua ajuda faz a diferença! Se já contribuiu, obrigado e desconsidere.",
+  },
+  {
+    hour: 19,
+    title: "Lembrete: ajuda de custo 🥋",
+    body: "Ainda dá tempo de contribuir até o dia 10. Sua ajuda faz a diferença! Se já contribuiu este mês, obrigado e desconsidere.",
+  },
+];
+
+export function costAidReminders(account: Account | null) {
+  if (!account?.active || account.role === "admin") return [];
+  return [5, 6, 7, 8, 9, 10].flatMap((day) =>
+    costAidMessages.map(({ hour, title, body }) => ({ day, hour, title, body })),
+  );
+}
