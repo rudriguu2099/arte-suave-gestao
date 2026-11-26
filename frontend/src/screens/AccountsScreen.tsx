@@ -3,19 +3,30 @@ import { Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AdminFooter } from "../components/access";
 import {
+  Back,
+  Badge,
+  type BadgeTone,
   Button,
   Dialog,
   ErrorMessage,
   Field,
+  HeaderBand,
   Heading,
   Page,
   Section,
+  colors,
   styles,
 } from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
 import { isStaff, canManageProfile, canChangePassword } from "../features/access/domain";
 import { profileRows } from "../features/access/profiles";
-import { roleLabels, type RootStackParamList } from "../features/access/types";
+import { roleLabels, type Role, type RootStackParamList } from "../features/access/types";
+
+function roleBadgeTone(role: Role, isSuperAdmin: boolean): BadgeTone {
+  if (isSuperAdmin || role === "admin") return "purple";
+  if (role === "responsible") return "lavender";
+  return "blue";
+}
 
 export default function AccountsScreen({
   navigation,
@@ -27,7 +38,9 @@ export default function AccountsScreen({
     ReturnType<typeof profileRows>[number] | null
   >(null);
   const [busy, setBusy] = useState(false);
+
   if (!isStaff(current)) return null;
+
   const rows = profileRows({ accounts, athletes });
   const filtered = rows.filter((row) =>
     (
@@ -41,6 +54,7 @@ export default function AccountsScreen({
       .toLocaleLowerCase()
       .includes(query.trim().toLocaleLowerCase()),
   );
+
   async function confirmStatus() {
     if (!pending || busy) return;
     setBusy(true);
@@ -54,6 +68,7 @@ export default function AccountsScreen({
       setBusy(false);
     }
   }
+
   return (
     <Page footer={<AdminFooter navigation={navigation} active="Accounts" />}>
       <Dialog
@@ -67,87 +82,101 @@ export default function AccountsScreen({
         onClose={() => setPending(null)}
         onConfirm={confirmStatus}
         busy={busy}
+        danger={pending?.active}
         confirmLabel={pending?.active ? "INATIVAR" : "ATIVAR"}
       />
-      <Heading
-        title="GERENCIAMENTO DE CONTAS"
-        subtitle="Todos os perfis e alunos em um único cadastro."
-      />
-      <Button
-        title="+ NOVO PERFIL"
-        onPress={() => navigation.navigate("AccountForm")}
-      />
-      <Field
-        label="Buscar perfil"
-        placeholder="Nome, e-mail ou função"
-        value={query}
-        onChangeText={setQuery}
-      />
+
+      <HeaderBand>
+        {navigation.canGoBack() && <Back onPress={navigation.goBack} />}
+        <Heading title="CONTAS DE ACESSO" />
+        <Button
+          title="+ NOVA CONTA"
+          onPress={() => navigation.navigate("AccountForm")}
+        />
+        <Field
+          label=""
+          surface
+          placeholder="Buscar por nome, e-mail ou função..."
+          value={query}
+          onChangeText={setQuery}
+        />
+      </HeaderBand>
+
       <ErrorMessage message={error} />
-      <View style={{ gap: 10 }}>
+
+      <View style={{ gap: 12 }}>
         {filtered.map((row) => (
-          <View key={row.key}>
-            <Section>
-              <View style={{ gap: 12, opacity: row.active ? 1 : 0.45 }}>
-              <View style={[styles.row, { flexWrap: "wrap", gap: 6 }]}>
-                <Text
-                  style={[
-                    styles.text,
-                    { fontWeight: "700", fontSize: 16, flexShrink: 1 },
-                  ]}
-                >
-                  {row.name}
-                </Text>
-                <View
-                  style={{
-                    backgroundColor: "#202020",
-                    paddingHorizontal: 5,
-                    paddingVertical: 3,
-                  }}
-                >
-                  <Text style={{ color: "white", fontSize: 8 }}>
-                    {row.isSuperAdmin
-                      ? "SUPERADMIN"
-                      : roleLabels[row.role].toUpperCase()}
-                  </Text>
+          <Section key={row.key} style={{ gap: 10 }}>
+            <View style={{ gap: 8, opacity: row.active ? 1 : 0.55 }}>
+              <View style={[styles.row, { alignItems: "flex-start", justifyContent: "space-between" }]}>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <View style={[styles.wrap, { gap: 8 }]}>
+                    <Text
+                      style={[
+                        styles.text,
+                        { fontWeight: "800", fontSize: 16, color: colors.ink, flexShrink: 1 },
+                      ]}
+                    >
+                      {row.name}
+                    </Text>
+                    <Badge
+                      label={
+                        row.isSuperAdmin
+                          ? "SUPERADMIN"
+                          : row.role === "admin"
+                            ? "ADMIN"
+                            : roleLabels[row.role]
+                      }
+                      tone={roleBadgeTone(row.role, row.isSuperAdmin)}
+                    />
+                    {!row.active && (
+                      <Badge
+                        label={row.hasAccess ? "CONTA INATIVA" : "INATIVO"}
+                        tone="gray"
+                      />
+                    )}
+                  </View>
+
+                  {!!row.emails[0] && (
+                    <Text style={styles.muted}>{row.emails[0]}</Text>
+                  )}
+
+                  {!row.hasAccess && (
+                    <Text style={styles.muted}>
+                      Aluno sem conta própria · Resp.: {row.guardianName ?? "Não vinculado"}
+                    </Text>
+                  )}
                 </View>
               </View>
-              {!!row.emails[0] && (
-                <Text style={styles.muted}>{row.emails[0]}</Text>
+            </View>
+
+            <View style={[styles.wrap, { gap: 8 }]}>
+              {canManageProfile(current, row.role) && (
+                <Button
+                  title="EDITAR"
+                  disabled={!row.active}
+                  compact
+                  secondary
+                  onPress={() => navigation.navigate("AccountForm", row.target)}
+                />
               )}
-              {!row.hasAccess && (
-                <Text style={styles.muted}>
-                  Aluno sem conta própria · Responsável:{" "}
-                  {row.guardianName ?? "Não vinculado"}
-                </Text>
+              {canManageProfile(current, row.role) && !row.isSuperAdmin && (
+                <Button
+                  title={row.active ? "INATIVAR" : "ATIVAR"}
+                  compact
+                  secondary={row.active}
+                  onPress={() => setPending(row)}
+                />
               )}
-              {!row.active && (
-                <Text style={styles.label}>
-                  {row.hasAccess ? "Conta inativa" : "Aluno inativo"}
-                </Text>
-              )}
-              </View>
-              <View style={styles.wrap}>
-                {canManageProfile(current, row.role) && (
+              {row.hasAccess &&
+                row.accountId &&
+                canChangePassword(current, row.accountId, row.role) && (
                   <Button
-                    title="EDITAR"
-                    disabled={!row.active}
-                    compact
-                    secondary
-                    onPress={() => navigation.navigate("AccountForm", row.target)}
-                  />
-                )}
-                {canManageProfile(current, row.role) && !row.isSuperAdmin && (
-                  <Button
-                    title={row.active ? "INATIVAR" : "ATIVAR"}
-                    compact
-                    secondary={row.active}
-                    onPress={() => setPending(row)}
-                  />
-                )}
-                {row.hasAccess && row.accountId && canChangePassword(current, row.accountId, row.role) && (
-                  <Button
-                    title={row.accountId === current?.id ? "ALTERAR MINHA SENHA" : "REDEFINIR SENHA"}
+                    title={
+                      row.accountId === current?.id
+                        ? "ALTERAR MINHA SENHA"
+                        : "REDEFINIR SENHA"
+                    }
                     disabled={!row.active}
                     compact
                     secondary
@@ -158,13 +187,15 @@ export default function AccountsScreen({
                     }
                   />
                 )}
-              </View>
-            </Section>
-          </View>
+            </View>
+          </Section>
         ))}
       </View>
+
       {!filtered.length && (
-        <Text style={styles.muted}>Nenhum perfil encontrado.</Text>
+        <View style={[styles.card, { alignItems: "center", paddingVertical: 22 }]}>
+          <Text style={styles.muted}>Nenhum perfil encontrado.</Text>
+        </View>
       )}
     </Page>
   );

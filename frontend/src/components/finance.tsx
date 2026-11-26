@@ -1,5 +1,5 @@
-import { Text, View } from "react-native";
-import { Button, styles } from "./ui";
+import { Pressable, Text, View } from "react-native";
+import { Badge, colors, styles } from "./ui";
 import {
   expenseCategoryLabel,
   paymentMethodLabel,
@@ -9,16 +9,18 @@ import {
 import { formatarReais } from "../utils/validators";
 
 export const financePalette = {
-  green: "#059669",
-  chartGreen: "#00C814",
-  red: "#E02424",
-  amber: "#D97706",
-  paidBg: "#E6F7EF",
-  paidBorder: "#A7F3D0",
-  pendingBg: "#FEF3C7",
-  pendingBorder: "#FCD34D",
-  pendingText: "#B45309",
-  pillTrack: "#EAEAEA",
+  green: colors.success,
+  chartGreen: "#059669",
+  red: colors.error,
+  amber: colors.warning,
+  paidBg: colors.successBg,
+  paidBorder: colors.successBorder,
+  pendingBg: colors.warningBg,
+  pendingBorder: colors.warningBorder,
+  pendingText: colors.warning,
+  pillTrack: colors.surface,
+  chartRevenue: "#4C1D95",
+  chartExpense: "#B9A8CE",
 };
 
 function entrySubtitle(entry: FinanceEntryItem): string {
@@ -46,40 +48,23 @@ export function FinanceEntryCard({ entry, onEdit }: { entry: FinanceEntryItem; o
   const isPaid = !isRevenue && entry.status === "PAGA";
 
   return (
-    <View style={[styles.card, { padding: 14, gap: 6 }]}>
+    <View style={[styles.card, { padding: 16, gap: 8 }]}>
       <View style={[styles.row, { justifyContent: "space-between", alignItems: "flex-start" }]}>
-        <View style={[styles.row, { flex: 1, minWidth: 0, gap: 8 }]}>
-          <Text numberOfLines={2} style={[styles.text, { fontWeight: "700", fontSize: 15, flexShrink: 1, minWidth: 0 }]}>
+        <View style={[styles.wrap, { flex: 1, minWidth: 0, gap: 8 }]}>
+          <Text
+            numberOfLines={2}
+            style={[styles.text, { fontWeight: "700", fontSize: 16, color: colors.ink, flexShrink: 1 }]}
+          >
             {titleText}
           </Text>
           {!isRevenue && (
-            <View
-              style={{
-                paddingHorizontal: 7,
-                paddingVertical: 2,
-                borderRadius: 3,
-                borderWidth: 1,
-                backgroundColor: isPaid ? financePalette.paidBg : financePalette.pendingBg,
-                borderColor: isPaid ? financePalette.paidBorder : financePalette.pendingBorder,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 9,
-                  fontWeight: "800",
-                  letterSpacing: 0.6,
-                  color: isPaid ? financePalette.green : financePalette.pendingText,
-                }}
-              >
-                {isPaid ? "PAGO" : "PENDENTE"}
-              </Text>
-            </View>
+            <Badge label={isPaid ? "PAGO" : "PENDENTE"} tone={isPaid ? "green" : "amber"} />
           )}
         </View>
         <Text
           style={{
-            fontSize: 15,
-            fontWeight: "800",
+            fontSize: 16,
+            fontWeight: "900",
             color: isRevenue ? financePalette.green : financePalette.red,
           }}
         >
@@ -88,10 +73,31 @@ export function FinanceEntryCard({ entry, onEdit }: { entry: FinanceEntryItem; o
       </View>
 
       <View style={[styles.row, { justifyContent: "space-between", alignItems: "flex-end" }]}>
-        <Text numberOfLines={3} style={[styles.muted, { flex: 1, minWidth: 0, fontSize: 11 }]}>
+        <Text numberOfLines={3} style={[styles.muted, { flex: 1, minWidth: 0, fontSize: 12 }]}>
           {entrySubtitle(entry)}
         </Text>
-        <Button title="EDITAR" compact secondary onPress={onEdit} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Editar ${titleText}`}
+          onPress={onEdit}
+          hitSlop={8}
+          style={({ pressed }) => ({
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: "700",
+              letterSpacing: 0.8,
+              color: colors.muted,
+            }}
+          >
+            EDITAR
+          </Text>
+        </Pressable>
       </View>
     </View>
   );

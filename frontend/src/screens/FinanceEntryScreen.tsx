@@ -10,6 +10,7 @@ import {
   Dialog,
   ErrorMessage,
   Field,
+  HeaderBand,
   Heading,
   Page,
   Section,
@@ -31,8 +32,8 @@ import { formatarMoeda, moedaParaNumero, numeroParaMoeda, validarLancamento } fr
 
 type Kind = "revenue" | "expense";
 const kinds = [
-  { kind: "revenue", label: "RECEITA", color: "#0CC50C" },
-  { kind: "expense", label: "DESPESA", color: "#D80000" },
+  { kind: "revenue", label: "RECEITA", color: colors.success },
+  { kind: "expense", label: "DESPESA", color: colors.error },
 ] as const;
 
 // HU015 (receita), HU016 (despesa), HU018 (doação/patrocínio) e edição a partir do painel (HU019 / RF012 / RF013).
@@ -67,6 +68,7 @@ export default function FinanceEntryScreen({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const submitted = useRef(false);
+
   if (!isSuperAdmin(current)) return null;
 
   const revenue = kind === "revenue";
@@ -180,13 +182,28 @@ export default function FinanceEntryScreen({
         title="Excluir lançamento"
         message={`Deseja excluir esta ${revenue ? "receita" : "despesa"} de R$ ${amount}? O saldo do período será recalculado.`}
         confirmLabel="EXCLUIR"
+        danger
         busy={deleting}
         onConfirm={remove}
         onClose={() => setConfirmDelete(false)}
       />
-      <Back onPress={navigation.goBack} />
-      <Heading title={edit ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"} />
-      <View style={{ flexDirection: "row" }}>
+
+      <HeaderBand>
+        <Back onPress={navigation.goBack} />
+        <Heading title={edit ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"} />
+      </HeaderBand>
+
+      {/* Seletor Receita / Despesa */}
+      <View
+        style={{
+          flexDirection: "row",
+          borderRadius: 12,
+          overflow: "hidden",
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.paper,
+        }}
+      >
         {kinds.map((option) => {
           const active = kind === option.kind;
           return (
@@ -198,20 +215,28 @@ export default function FinanceEntryScreen({
               onPress={() => changeKind(option.kind)}
               style={{
                 flex: 1,
-                minHeight: 44,
+                minHeight: 46,
                 alignItems: "center",
                 justifyContent: "center",
-                borderWidth: 1,
-                borderColor: active ? option.color : colors.border,
                 backgroundColor: active ? option.color : colors.paper,
                 opacity: edit && !active ? 0.45 : 1,
               }}
             >
-              <Text style={[styles.text, { color: active ? colors.paper : colors.ink }]}>{option.label}</Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "800",
+                  letterSpacing: 1.2,
+                  color: active ? colors.paper : colors.muted,
+                }}
+              >
+                {option.label}
+              </Text>
             </Pressable>
           );
         })}
       </View>
+
       <Section>
         <Select
           label="Categoria *"
@@ -220,7 +245,13 @@ export default function FinanceEntryScreen({
           options={revenue ? revenueCategories : expenseCategories}
         />
         {category === "OUTROS" && (
-          <Field label="Título *" placeholder="Ex: Rifa beneficente" maxLength={80} value={title} onChangeText={setTitle} />
+          <Field
+            label="Título *"
+            placeholder="Ex: Rifa beneficente"
+            maxLength={80}
+            value={title}
+            onChangeText={setTitle}
+          />
         )}
         <Field
           label="Valor (R$) *"
@@ -240,7 +271,12 @@ export default function FinanceEntryScreen({
           onChangeText={setDescription}
         />
         {revenue ? (
-          <Select label="Forma de recebimento *" value={paymentMethod} onChange={setPaymentMethod} options={paymentMethods} />
+          <Select
+            label="Forma de recebimento *"
+            value={paymentMethod}
+            onChange={setPaymentMethod}
+            options={paymentMethods}
+          />
         ) : (
           <Select label="Situação *" value={status} onChange={setStatus} options={expenseStatuses} />
         )}
@@ -269,7 +305,9 @@ export default function FinanceEntryScreen({
           </>
         )}
       </Section>
+
       <ErrorMessage message={error} />
+
       <View style={styles.row}>
         <Button title="CANCELAR" secondary disabled={saving} onPress={navigation.goBack} />
         <View style={{ flex: 1 }}>
@@ -280,10 +318,11 @@ export default function FinanceEntryScreen({
           />
         </View>
       </View>
+
       {edit && (
         <Button
           title="EXCLUIR LANÇAMENTO"
-          secondary
+          danger
           disabled={saving || deleting}
           onPress={() => setConfirmDelete(true)}
         />

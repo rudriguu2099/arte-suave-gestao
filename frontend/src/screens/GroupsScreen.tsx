@@ -4,11 +4,13 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AdminFooter } from "../components/access";
 import {
   Back,
+  Badge,
   Button,
   colors,
   Dialog,
   ErrorMessage,
   Field,
+  HeaderBand,
   Heading,
   Page,
   Section,
@@ -29,8 +31,15 @@ const week = [1, 2, 3, 4, 5, 6, 0];
 
 function DayTag({ weekday }: { weekday: number }) {
   return (
-    <View style={{ backgroundColor: colors.ink, paddingHorizontal: 6, paddingVertical: 2 }}>
-      <Text style={{ color: colors.paper, fontSize: 10, fontWeight: "700" }}>
+    <View
+      style={{
+        backgroundColor: colors.primary,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+      }}
+    >
+      <Text style={{ color: colors.paper, fontSize: 11, fontWeight: "700" }}>
         {weekdayLabels[weekday]}
       </Text>
     </View>
@@ -44,7 +53,9 @@ export function GroupsScreen({
   const [pending, setPending] = useState<Group | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
   if (!isStaff(current)) return null;
+
   async function confirmStatus() {
     if (!pending || busy) return;
     setBusy(true);
@@ -58,6 +69,7 @@ export function GroupsScreen({
       setBusy(false);
     }
   }
+
   return (
     <Page footer={<AdminFooter navigation={navigation} active="Groups" />}>
       <Dialog
@@ -73,34 +85,46 @@ export function GroupsScreen({
         onClose={() => setPending(null)}
         onConfirm={confirmStatus}
         busy={busy}
+        danger={pending?.active}
         confirmLabel={pending?.active ? "INATIVAR" : "ATIVAR"}
       />
-      <Heading title="TURMAS" subtitle="Crie, edite e inative turmas" />
-      <Button title="+ NOVA TURMA" onPress={() => navigation.navigate("GroupForm")} />
+
+      <HeaderBand>
+        {navigation.canGoBack() && <Back onPress={navigation.goBack} />}
+        <Heading title="TURMAS" />
+        <Button title="+ NOVA TURMA" onPress={() => navigation.navigate("GroupForm")} />
+      </HeaderBand>
+
       <ErrorMessage message={error} />
-      <View style={{ gap: 10 }}>
+
+      <View style={{ gap: 12 }}>
         {groups.map((group) => (
           <Section key={group.id}>
             <View style={[styles.row, { alignItems: "flex-start" }]}>
-                <Pressable
-                  style={{ flex: 1, gap: 6, opacity: group.active ? 1 : 0.45 }}
-                  onPress={() => navigation.navigate("Students", { groupId: group.id })}
-                >                
-                <Text style={[styles.text, { fontWeight: "700", fontSize: 16 }]}>
-                  {group.name}
-                </Text>
+              <Pressable
+                style={{ flex: 1, gap: 8, opacity: group.active ? 1 : 0.55 }}
+                onPress={() => navigation.navigate("Students", { groupId: group.id })}
+              >
+                <View style={[styles.wrap, { gap: 8 }]}>
+                  <Text style={[styles.text, { fontWeight: "800", fontSize: 16, color: colors.ink }]}>
+                    {group.name}
+                  </Text>
+                  {!group.active && <Badge label="INATIVA" tone="gray" />}
+                </View>
+
                 {!!(group.ageRange || group.level) && (
-                  <Text style={[styles.muted, { fontSize: 10 }]}>
+                  <Text style={styles.muted}>
                     {[group.ageRange, group.level].filter(Boolean).join(" · ")}
                   </Text>
                 )}
+
                 {group.sessions.length ? (
-                  <View style={styles.wrap}>
+                  <View style={[styles.wrap, { gap: 8 }]}>
                     {group.sessions.map((session) => (
-                      <View key={session.weekday + session.start} style={[styles.row, { gap: 4 }]}>
+                      <View key={session.weekday + session.start} style={[styles.row, { gap: 6 }]}>
                         <DayTag weekday={session.weekday} />
-                        <Text style={[styles.muted, { fontSize: 11 }]}>
-                          {session.start}-{session.end}
+                        <Text style={[styles.muted, { fontSize: 12, color: colors.text }]}>
+                          {session.start}–{session.end}
                         </Text>
                       </View>
                     ))}
@@ -108,16 +132,9 @@ export function GroupsScreen({
                 ) : (
                   <Text style={styles.muted}>{group.schedule}</Text>
                 )}
-                {!group.active && <Text style={styles.label}>Turma inativa</Text>}
-                </Pressable>
-              <View style={{ gap: 8 }}>
-                {group.active && (
-                  <Button
-                    title="CHAMADA"
-                    compact
-                    onPress={() => navigation.navigate("AttendanceForm", { groupId: group.id })}
-                  />
-                )}
+              </Pressable>
+
+              <View style={{ gap: 6, alignItems: "stretch" }}>
                 <Button
                   title="EDITAR"
                   compact
@@ -136,7 +153,12 @@ export function GroupsScreen({
           </Section>
         ))}
       </View>
-      {!groups.length && <Text style={styles.muted}>Nenhuma turma cadastrada.</Text>}
+
+      {!groups.length && (
+        <View style={[styles.card, { alignItems: "center", paddingVertical: 24 }]}>
+          <Text style={styles.muted}>Nenhuma turma cadastrada.</Text>
+        </View>
+      )}
     </Page>
   );
 }
@@ -145,7 +167,7 @@ export function GroupFormScreen({
   route,
   navigation,
 }: NativeStackScreenProps<RootStackParamList, "GroupForm">) {
-  const { groups, current, saveGroup } = useAccess();
+  const { groups, current, saveGroup, toggleGroupActive } = useAccess();
   const groupId = route.params?.groupId;
   const existing = groups.find((group) => group.id === groupId);
   const [name, setName] = useState(existing?.name ?? "");
@@ -154,15 +176,20 @@ export function GroupFormScreen({
   const [sessions, setSessions] = useState<GroupSession[]>(existing?.sessions ?? []);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmToggle, setConfirmToggle] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const submitted = useRef(false);
+
   if (!isStaff(current)) return null;
-  if (groupId && !existing)
+  if (groupId && !existing) {
     return (
       <Page>
         <Back onPress={navigation.goBack} />
         <ErrorMessage message="Turma não encontrada." />
       </Page>
     );
+  }
+
   function toggleDay(weekday: number) {
     setSessions((previous) =>
       previous.some((session) => session.weekday === weekday)
@@ -170,6 +197,7 @@ export function GroupFormScreen({
         : [...previous, { weekday, start: "", end: "" }],
     );
   }
+
   function setTime(weekday: number, field: "start" | "end", value: string) {
     setSessions((previous) =>
       previous.map((session) =>
@@ -177,6 +205,7 @@ export function GroupFormScreen({
       ),
     );
   }
+
   async function save() {
     if (submitted.current) return;
     submitted.current = true;
@@ -192,16 +221,51 @@ export function GroupFormScreen({
       setSaving(false);
     }
   }
+
+  async function handleToggleActive() {
+    if (!existing || toggling) return;
+    setToggling(true);
+    setError("");
+    try {
+      await toggleGroupActive(existing.id);
+      setConfirmToggle(false);
+      navigation.goBack();
+    } catch (e) {
+      setConfirmToggle(false);
+      setError((e as Error).message);
+    } finally {
+      setToggling(false);
+    }
+  }
+
   const selected = week
     .map((weekday) => sessions.find((session) => session.weekday === weekday))
-    .filter((session) => !!session);
+    .filter((session): session is GroupSession => !!session);
+
   return (
     <Page>
-      <Back onPress={navigation.goBack} />
-      <Heading
-        title={existing ? "EDITAR TURMA" : "NOVA TURMA"}
-        subtitle="Nome, critério e horários de treino"
+      <Dialog
+        visible={confirmToggle}
+        title={existing?.active ? "Inativar turma?" : "Ativar turma?"}
+        message={
+          existing
+            ? existing.active
+              ? `${existing.name}: a turma deixa de receber novos alunos. Só é possível inativar uma turma sem alunos ativos.`
+              : `${existing.name}: a turma volta a receber novos alunos.`
+            : ""
+        }
+        confirmLabel={existing?.active ? "INATIVAR" : "ATIVAR"}
+        danger={existing?.active}
+        busy={toggling}
+        onConfirm={handleToggleActive}
+        onClose={() => setConfirmToggle(false)}
       />
+
+      <HeaderBand>
+        <Back onPress={navigation.goBack} />
+        <Heading title={existing ? "EDITAR TURMA" : "NOVA TURMA"} />
+      </HeaderBand>
+
       <Section>
         <Field
           label="Nome da turma *"
@@ -225,8 +289,8 @@ export function GroupFormScreen({
           onChangeText={setLevel}
         />
       </Section>
-      <Section>
-        <Text style={styles.label}>Dias e horários *</Text>
+
+      <Section title="Dias e horários *">
         <View style={styles.wrap}>
           {week.map((weekday) => {
             const active = sessions.some((session) => session.weekday === weekday);
@@ -237,58 +301,81 @@ export function GroupFormScreen({
                 accessibilityState={{ checked: active }}
                 onPress={() => toggleDay(weekday)}
                 style={{
-                  minWidth: 44,
-                  minHeight: 44,
-                  paddingHorizontal: 8,
+                  minWidth: 48,
+                  minHeight: 42,
+                  paddingHorizontal: 12,
+                  borderRadius: active ? 10 : 999,
                   alignItems: "center",
                   justifyContent: "center",
                   borderWidth: 1,
-                  borderColor: active ? colors.ink : colors.border,
-                  backgroundColor: active ? colors.ink : colors.paper,
+                  borderColor: active ? colors.primary : colors.border,
+                  backgroundColor: active ? colors.primary : colors.paper,
                 }}
               >
-                <Text style={[styles.text, { color: active ? colors.paper : colors.ink }]}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: active ? "800" : "600",
+                    color: active ? colors.paper : colors.muted,
+                  }}
+                >
                   {weekdayLabels[weekday]}
                 </Text>
               </Pressable>
             );
           })}
         </View>
-        {!selected.length && <Text style={styles.muted}>Selecione pelo menos um dia de treino</Text>}
+
+        {!selected.length && (
+          <Text style={styles.muted}>Selecione pelo menos um dia de treino.</Text>
+        )}
+
         {selected.map((session) => (
           <View key={session.weekday} style={styles.row}>
-            <View style={{ width: 32 }}>
+            <View style={{ width: 42, alignItems: "flex-start" }}>
               <DayTag weekday={session.weekday} />
             </View>
             {(["start", "end"] as const).map((field, index) => (
-              <View key={field} style={[styles.row, { flex: 1, minWidth: 0 }]}>
-                {index > 0 && <Text style={styles.muted}>—</Text>}
+              <View key={field} style={[styles.row, { flex: 1, minWidth: 0, gap: 6 }]}>
+                {index > 0 && <Text style={styles.muted}>–</Text>}
                 <TextInput
                   accessibilityLabel={`${weekdayLabels[session.weekday]}: ${field === "start" ? "início" : "término"}`}
                   placeholder={field === "start" ? "18:00" : "19:30"}
-                  placeholderTextColor="#929292"
+                  placeholderTextColor={colors.placeholder}
                   keyboardType="number-pad"
                   maxLength={5}
                   value={session[field]}
                   onChangeText={(value) => setTime(session.weekday, field, value)}
-                  style={[styles.input, { flex: 1, minWidth: 0 }]}
+                  style={[styles.input, { flex: 1, minWidth: 0, textAlign: "center" }]}
                 />
               </View>
             ))}
           </View>
         ))}
       </Section>
+
       <ErrorMessage message={error} />
+
       <View style={styles.row}>
         <Button title="CANCELAR" secondary disabled={saving} onPress={navigation.goBack} />
         <View style={{ flex: 1 }}>
           <Button
-            title={saving ? "SALVANDO..." : existing ? "SALVAR ALTERAÇÕES" : "CRIAR TURMA"}
+            title={saving ? "SALVANDO..." : existing ? "SALVAR" : "CRIAR TURMA"}
             disabled={saving}
             onPress={save}
           />
         </View>
       </View>
+
+      {existing && (
+        <Button
+          title={existing.active ? "INATIVAR TURMA" : "ATIVAR TURMA"}
+          danger={existing.active}
+          secondary={!existing.active}
+          disabled={saving || toggling}
+          onPress={() => setConfirmToggle(true)}
+        />
+      )}
     </Page>
   );
 }

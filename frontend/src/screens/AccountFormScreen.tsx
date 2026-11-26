@@ -3,17 +3,20 @@ import { Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   Back,
+  Badge,
   Button,
   Check,
   Contacts,
   DateField,
-  ErrorMessage,
   Dialog,
+  ErrorMessage,
   Field,
+  HeaderBand,
   Heading,
   Page,
   Section,
   Select,
+  colors,
   styles,
 } from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
@@ -27,6 +30,7 @@ import {
 import {
   roleLabels,
   type ProfileInput,
+  type ProfileTarget,
   type Role,
   type RootStackParamList,
 } from "../features/access/types";
@@ -36,7 +40,14 @@ export default function AccountFormScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, "AccountForm">) {
   const { accounts, athletes, groups, current, saveProfile } = useAccess();
-  const target = route.params;
+  const params = route.params;
+  const target: ProfileTarget | undefined = params?.accountId
+    ? { accountId: params.accountId }
+    : params?.athleteId
+      ? { athleteId: params.athleteId }
+      : undefined;
+  const defaultRole = params?.defaultRole;
+
   const student = target?.athleteId
     ? athletes.find((item) => item.id === target.athleteId)
     : athletes.find(
@@ -53,7 +64,7 @@ export default function AccountFormScreen({
     person?.phones.length ? person.phones : [""],
   );
   const [role, setRole] = useState<Role | "">(
-    existing?.role ?? (student ? "athlete" : ""),
+    existing?.role ?? (student ? "athlete" : (defaultRole ?? "")),
   );
   const [groupId, setGroupId] = useState(student?.groupId ?? "");
   const [guardianId, setGuardianId] = useState(student?.guardianId ?? "");
@@ -62,12 +73,14 @@ export default function AccountFormScreen({
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const submitted = useRef(false);
+
   const age = ageOn(birthDate);
   const minor = role === "athlete" && age >= 0 && age < 18;
   const createsAccess = !!role && age >= 0 && !minor && !existing;
   const guardians = accounts.filter(
     (account) => account.role === "responsible" && account.active,
   );
+
   let preview = "";
   if (createsAccess) {
     try {
@@ -76,16 +89,25 @@ export default function AccountFormScreen({
       /* Wait for complete input. */
     }
   }
+
   if (!isStaff(current)) return null;
-  if (existing && !canManageProfile(current, existing.role))
-    return <Page><Back onPress={navigation.goBack} /><ErrorMessage message="Somente o superadmin pode gerenciar administradores." /></Page>;
-  if (target && !person)
+  if (existing && !canManageProfile(current, existing.role)) {
+    return (
+      <Page>
+        <Back onPress={navigation.goBack} />
+        <ErrorMessage message="Somente o superadmin pode gerenciar administradores." />
+      </Page>
+    );
+  }
+  if (target && !person) {
     return (
       <Page>
         <Back onPress={navigation.goBack} />
         <ErrorMessage message="Perfil não encontrado." />
       </Page>
     );
+  }
+
   async function save() {
     if (submitted.current) return;
     if (!role) {
@@ -124,6 +146,15 @@ export default function AccountFormScreen({
       setSaving(false);
     }
   }
+
+  const pageTitle = target
+    ? role === "athlete"
+      ? "EDITAR ATLETA"
+      : "EDITAR PERFIL"
+    : role === "athlete"
+      ? "NOVO ATLETA"
+      : "NOVO PERFIL";
+
   return (
     <Page>
       <Dialog
@@ -132,25 +163,35 @@ export default function AccountFormScreen({
         message={success}
         onClose={() => navigation.goBack()}
       />
-      <Back onPress={navigation.goBack} />
-      <Heading
-        title={target ? "EDITAR PERFIL" : "NOVO PERFIL"}
-        subtitle={isSuperAdmin(current) ? "Cadastro unificado de administradores, responsáveis e alunos." : "Cadastro de responsáveis e alunos."}
-      />
+
+      <HeaderBand>
+        <Back onPress={navigation.goBack} />
+        <Heading
+          title={pageTitle}
+          subtitle={
+            isSuperAdmin(current)
+              ? "Cadastro unificado de administradores, responsáveis e atletas."
+              : "Cadastro de responsáveis e atletas."
+          }
+        />
+      </HeaderBand>
+
       <Section title="Função">
         {existing?.isSuperAdmin ? (
-          <>
-            <Text style={styles.text}>Superadmin</Text>
+          <View style={{ gap: 6 }}>
+            <Badge label="SUPERADMIN" tone="purple" />
             <Text style={styles.muted}>Perfil definido no banco de dados.</Text>
-          </>
+          </View>
         ) : (
           <Select
             label="Função *"
             value={role}
-            options={Object.entries(roleLabels).filter(([value]) => canManageProfile(current, value as Role)).map(([value, label]) => ({
-              value,
-              label,
-            }))}
+            options={Object.entries(roleLabels)
+              .filter(([value]) => canManageProfile(current, value as Role))
+              .map(([value, label]) => ({
+                value,
+                label,
+              }))}
             onChange={(value) => {
               setRole(value as Role);
               setError("");
@@ -170,23 +211,24 @@ export default function AccountFormScreen({
           </Text>
         )}
       </Section>
-      <Section
-        title={role === "athlete" ? "Dados do aluno" : "Dados do titular"}
-      >
+
+      <Section title={role === "athlete" ? "Dados do atleta" : "Dados do titular"}>
         <Field
           label="Nome completo *"
-          placeholder="Nome completo"
+          placeholder={role === "athlete" ? "Nome do atleta" : "Nome completo"}
           value={name}
           onChangeText={setName}
           autoCapitalize="words"
         />
         <DateField label="Data de nascimento *" value={birthDate} onChange={setBirthDate} />
-        <Field
-          label="Idade (calculada)"
-          value={age >= 0 ? age + " anos" : ""}
-          placeholder="Preencha a data de nascimento"
-          editable={false}
-        />
+        {age >= 0 && (
+          <View style={[styles.wrap, { gap: 8 }]}>
+            <Badge
+              label={`${age < 18 ? "MENOR" : "ADULTO"} · ${age} ANOS`}
+              tone={age < 18 ? "lavender" : "blue"}
+            />
+          </View>
+        )}
         <Contacts
           kind="email"
           values={[email]}
@@ -195,34 +237,53 @@ export default function AccountFormScreen({
         />
         <Contacts kind="phone" values={phones} onChange={setPhones} />
       </Section>
+
       {role === "athlete" && (
-        <Section title="Vínculo do aluno">
+        <Section title="Turma e vínculo">
           <Select
             label="Turma *"
             value={groupId}
             // Turma inativa não recebe alunos novos; quem já está nela continua podendo ser editado.
-            options={groups.filter((group) => group.active || group.id === student?.groupId).map((group) => ({
-              value: group.id,
-              label: group.name + " · " + group.schedule,
-            }))}
+            options={groups
+              .filter((group) => group.active || group.id === student?.groupId)
+              .map((group) => ({
+                value: group.id,
+                label: group.name + " · " + group.schedule,
+              }))}
             onChange={setGroupId}
           />
+          {student && groupId === student.groupId && (
+            <View style={[styles.row, { gap: 6 }]}>
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: colors.success,
+                }}
+              />
+              <Text style={styles.muted}>
+                {groups.find((g) => g.id === student.groupId)?.name ?? "Turma atual"} (atual)
+              </Text>
+            </View>
+          )}
           {minor ? (
             <>
               <Select
-                label="Responsável já cadastrado *"
+                label="Responsável legal *"
                 value={guardianId}
                 options={guardians.map((account) => ({
                   value: account.id,
-                  label: account.name,
+                  label: account.phones[0]
+                    ? `${account.name} — ${account.phones[0]}`
+                    : account.name,
                 }))}
                 onChange={setGuardianId}
               />
               {!guardians.length && (
-                <Text accessibilityRole="alert" style={styles.muted}>
+                <Text accessibilityRole="alert" style={[styles.muted, { color: colors.error }]}>
                   Nenhum responsável ativo disponível. Cancele este cadastro e
-                  cadastre primeiro um perfil de Responsável em Gerenciamento de
-                  Contas.
+                  cadastre primeiro um perfil de Responsável em Contas de Acesso.
                 </Text>
               )}
               <Text style={styles.muted}>
@@ -242,6 +303,7 @@ export default function AccountFormScreen({
           )}
         </Section>
       )}
+
       {createsAccess && (
         <Section title="Senha inicial automática">
           <Field
@@ -262,30 +324,29 @@ export default function AccountFormScreen({
           </Text>
         </Section>
       )}
+
       <ErrorMessage message={error} />
-      <View
-        style={[
-          styles.row,
-          { justifyContent: "space-between", flexWrap: "wrap" },
-        ]}
-      >
+
+      <View style={styles.row}>
         <Button
           title="CANCELAR"
           secondary
           disabled={saving}
           onPress={navigation.goBack}
         />
-        <Button
-          title={
-            saving
-              ? "SALVANDO..."
-              : target
-                ? "SALVAR ALTERAÇÕES"
-                : "CADASTRAR PERFIL"
-          }
-          onPress={save}
-          disabled={saving || !!success || (minor && !guardians.length)}
-        />
+        <View style={{ flex: 1 }}>
+          <Button
+            title={
+              saving
+                ? "SALVANDO..."
+                : target
+                  ? "SALVAR"
+                  : "CADASTRAR"
+            }
+            onPress={save}
+            disabled={saving || !!success || (minor && !guardians.length)}
+          />
+        </View>
       </View>
     </Page>
   );

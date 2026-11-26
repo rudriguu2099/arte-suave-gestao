@@ -1,15 +1,18 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 
 import {
   Page,
+  HeaderBand,
   Heading,
+  Badge,
   Button,
   Field,
   Select,
   Back,
+  ErrorMessage,
   styles as globalStyles,
   colors,
 } from "../components/ui";
@@ -112,191 +115,181 @@ export default function AtletasScreen({ navigation, route }: AtletasScreenProps)
   }, [navigation, loadAthletes]);
 
   return (
-    <Page
-      footer={<AdminFooter navigation={navigation as any} active="Students" />}
-    >
-      <Back onPress={() => navigation.goBack()} />
+    <Page footer={<AdminFooter navigation={navigation} active="Students" />}>
+      <HeaderBand>
+        {!!lockedGroup && <Back onPress={() => navigation.goBack()} />}
 
-      <Heading title="ATLETAS" subtitle={lockedGroup ? lockedGroup.name : "Visualização, busca e filtros"} />
-
-      {lockedGroup && (
-        <View style={[globalStyles.row, { marginTop: 12, alignItems: "stretch" }]}>
-          {lockedGroup.active && (
-            <View style={{ flex: 1 }}>
-              <Button
-                style={{ flex: 1 }}
-                title="REALIZAR CHAMADA"
-                onPress={() => navigation.navigate("AttendanceForm", { groupId: lockedGroup.id })}
-              />
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Button
-              style={{ flex: 1 }}
-              title="HISTÓRICO"
-              secondary
-              onPress={() => navigation.navigate("AttendanceHistory", { groupId: lockedGroup.id })}
-            />
-          </View>
-        </View>
-      )}
-
-      {/* Área de Filtros */}
-      <View style={{ marginTop: 16, gap: 12 }}>
-        <Field
-          label=""
-          placeholder="Buscar por nome..."
-          value={search}
-          onChangeText={setSearch}
+        <Heading
+          title="ATLETAS"
+          subtitle={lockedGroup ? lockedGroup.name : undefined}
         />
 
-        <View style={globalStyles.row}>
-          {!lockedGroupId && (
-            <View style={{ flex: 2 }}>
-              <Select
-                label=""
-                placeholder="Todas as turmas"
-                value={groupId}
-                options={groupOptions}
-                onChange={setGroupId}
+        {lockedGroup ? (
+          <View style={[globalStyles.row, { alignItems: "stretch" }]}>
+            {lockedGroup.active && (
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="REALIZAR CHAMADA"
+                  onPress={() => navigation.navigate("AttendanceForm", { groupId: lockedGroup.id })}
+                />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Button
+                title="HISTÓRICO"
+                secondary
+                onPress={() => navigation.navigate("AttendanceHistory", { groupId: lockedGroup.id })}
               />
             </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Select
-              label=""
-              placeholder="Todos"
-              value={active}
-              options={statusOptions}
-              onChange={setActive}
+          </View>
+        ) : (
+          <View style={globalStyles.row}>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="+ NOVO ATLETA"
+                onPress={() => navigation.navigate("AccountForm", { defaultRole: "athlete" })}
+              />
+            </View>
+            <Button
+              title="TURMAS"
+              secondary
+              onPress={() => navigation.navigate("Groups")}
+              style={{ paddingHorizontal: 18 }}
             />
           </View>
-        </View>
-      </View>
+        )}
 
-      {!!error && (
-        <Text style={[globalStyles.text, { color: colors.error, marginTop: 16 }]}>
-          {error}
-        </Text>
-      )}
+        {/* Área de Filtros */}
+        <View style={{ gap: 10 }}>
+          <Field
+            label=""
+            surface
+            placeholder="Buscar por nome..."
+            value={search}
+            onChangeText={setSearch}
+          />
+
+          <View style={globalStyles.row}>
+            {!lockedGroupId && (
+              <View style={{ flex: 2 }}>
+                <Select
+                  label=""
+                  surface
+                  placeholder="Todas as turmas"
+                  value={groupId}
+                  options={groupOptions}
+                  onChange={setGroupId}
+                />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Select
+                label=""
+                surface
+                placeholder="Todos"
+                value={active}
+                options={statusOptions}
+                onChange={setActive}
+              />
+            </View>
+          </View>
+        </View>
+      </HeaderBand>
+
+      <ErrorMessage message={error} />
 
       {/* Lista de Atletas */}
-      <View style={{ marginTop: 24, gap: 16 }}>
+      <View style={{ gap: 12 }}>
         {loading ? (
-          <ActivityIndicator size="large" color={colors.ink} style={{ marginTop: 20 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
         ) : !error && athletes.length === 0 ? (
-          <Text style={[globalStyles.muted, { textAlign: "center", marginTop: 20 }]}>
-            Nenhum atleta encontrado.
-          </Text>
+          <View style={[globalStyles.card, { alignItems: "center", paddingVertical: 24 }]}>
+            <Text style={globalStyles.muted}>Nenhum atleta encontrado.</Text>
+          </View>
         ) : (
-          athletes.map((athlete) => (
-            <View
-              key={athlete.id}
-              style={[globalStyles.card, !athlete.active && { opacity: 0.5 }]}
-            >
+          athletes.map((athlete) => {
+            const minor = isMinor(athlete);
+            const highAbsences = athlete.absenceCount >= 3;
+            return (
               <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                }}
+                key={athlete.id}
+                style={[globalStyles.card, !athlete.active && { opacity: 0.55 }]}
               >
-                <View style={{ flex: 1 }}>
-                  <View style={globalStyles.wrap}>
-                    <Text style={[globalStyles.text, { fontWeight: "bold", fontSize: 16 }]}>
-                      {athlete.name}
-                    </Text>
-
-                    <View style={styles.tagDark}>
-                      <Text style={styles.tagTextLight}>
-                        {isMinor(athlete) ? "MENOR" : "ADULTO"}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <View style={globalStyles.wrap}>
+                      <Text
+                        style={[
+                          globalStyles.text,
+                          { fontWeight: "800", fontSize: 16, color: colors.ink },
+                        ]}
+                      >
+                        {athlete.name}
                       </Text>
+
+                      <Badge
+                        label={minor ? "MENOR" : "ADULTO"}
+                        tone={minor ? "lavender" : "blue"}
+                      />
+
+                      {!athlete.active && <Badge label="INATIVO" tone="gray" />}
                     </View>
 
-                    {!athlete.active && (
-                      <View style={styles.tagLight}>
-                        <Text style={styles.tagTextDark}>INATIVO</Text>
-                      </View>
-                    )}
+                    <Text style={[globalStyles.muted, { fontSize: 12 }]}>
+                      {athlete.group?.name ?? "Sem turma"} · {formatDate(athlete.birthDate)}
+                      {athlete.guardian?.name ? ` · Resp.: ${athlete.guardian.name}` : ""}
+                    </Text>
                   </View>
 
-                  <Text style={[globalStyles.muted, { marginTop: 4, fontSize: 11 }]}>
-                    {athlete.group?.name ?? "Sem turma"} - {formatDate(athlete.birthDate)}
-                    {athlete.guardian?.name ? ` - Resp: ${athlete.guardian.name}` : ""}
-                  </Text>
+                  <View style={{ alignItems: "flex-end", marginLeft: 12 }}>
+                    <Text
+                      style={{
+                        fontWeight: "900",
+                        fontSize: 22,
+                        lineHeight: 24,
+                        color: highAbsences ? colors.warning : "#C3B9D6",
+                      }}
+                    >
+                      {athlete.absenceCount}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 9,
+                        color: colors.muted,
+                        fontWeight: "700",
+                        letterSpacing: 0.6,
+                      }}
+                    >
+                      FALTAS
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={{ alignItems: "center", marginLeft: 12 }}>
-                  <Text style={{ fontWeight: "800", fontSize: 18, color: colors.ink }}>
-                    {athlete.absenceCount}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 8,
-                      color: colors.muted,
-                      fontWeight: "bold",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    FALTAS
-                  </Text>
+                <View style={[globalStyles.wrap, { gap: 8, marginTop: 2 }]}>
+                  <Button
+                    compact
+                    secondary
+                    title="EDITAR"
+                    onPress={() => navigation.navigate("AccountForm", { athleteId: athlete.id })}
+                  />
+                  <Button
+                    compact
+                    secondary
+                    title="FREQUÊNCIA"
+                    onPress={() => navigation.navigate("AttendanceHistory", { studentId: athlete.id })}
+                  />
                 </View>
               </View>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  gap: 8,
-                  marginTop: 12,
-                }}
-              >
-                <Button
-                  compact
-                  secondary
-                  title="Editar"
-                  onPress={() => navigation.navigate("AccountForm", { athleteId: athlete.id })}
-                />
-                <Button
-                  compact
-                  secondary
-                  title="FREQ."
-                  onPress={() => navigation.navigate("AttendanceHistory", { studentId: athlete.id })}
-                />
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </View>
     </Page>
   );
 }
-
-const styles = StyleSheet.create({
-  tagDark: {
-    backgroundColor: colors.ink,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 2,
-    justifyContent: "center",
-  },
-  tagTextLight: {
-    color: colors.paper,
-    fontSize: 8,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
-  },
-  tagLight: {
-    backgroundColor: colors.border,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 2,
-    justifyContent: "center",
-  },
-  tagTextDark: {
-    color: colors.muted,
-    fontSize: 8,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
-  },
-});

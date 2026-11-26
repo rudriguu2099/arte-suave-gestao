@@ -8,7 +8,7 @@ export default function App() {
     <SafeAreaProvider>
         <AccessProvider>
           <Routes />
-          <StatusBar style="auto" />
+          <StatusBar style="dark" />
         </AccessProvider>
     </SafeAreaProvider>
   );

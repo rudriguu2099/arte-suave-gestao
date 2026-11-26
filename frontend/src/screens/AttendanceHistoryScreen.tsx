@@ -3,8 +3,20 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AdminFooter } from "../components/access";
-import { financePalette } from "../components/finance";
-import { Back, Button, colors, DateField, ErrorMessage, Heading, Page, Section, styles } from "../components/ui";
+import {
+  Back,
+  Badge,
+  Button,
+  colors,
+  DateField,
+  ErrorMessage,
+  HeaderBand,
+  Heading,
+  Page,
+  Section,
+  SectionLabel,
+  styles,
+} from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
 import { isStaff, parseBirthDate } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
@@ -16,28 +28,21 @@ import {
   type StudentAttendanceHistory,
 } from "../services/attendance";
 
-
 const ptBR = (date: Date) => date.toLocaleDateString("pt-BR");
 
-// Cores das etiquetas e dos totais: verde para presença, vermelho para falta (mesma paleta do financeiro).
-const tones = {
-  ok: { background: financePalette.paidBg, color: financePalette.green },
-  bad: { background: "#FDECEC", color: financePalette.red },
-};
-
-function Pill({ text, tone }: { text: string; tone: keyof typeof tones }) {
+function TotalCard({
+  label,
+  value,
+  color = colors.ink,
+}: {
+  label: string;
+  value: number;
+  color?: string;
+}) {
   return (
-    <View style={{ backgroundColor: tones[tone].background, paddingHorizontal: 6, paddingVertical: 2 }}>
-      <Text style={{ fontSize: 10, fontWeight: "800", color: tones[tone].color }}>{text}</Text>
-    </View>
-  );
-}
-
-function Total({ label, value, color = colors.ink }: { label: string; value: number; color?: string }) {
-  return (
-    <View style={[styles.card, { flex: 1, gap: 2 }]}>
-      <Text style={{ fontSize: 26, fontWeight: "800", color }}>{value}</Text>
-      <Text style={[styles.muted, { fontSize: 10 }]}>{label}</Text>
+    <View style={[styles.card, { flex: 1, paddingVertical: 16, paddingHorizontal: 14, gap: 4 }]}>
+      <Text style={{ fontSize: 26, fontWeight: "900", color }}>{value}</Text>
+      <Text style={[styles.label, { fontSize: 9.5 }]}>{label}</Text>
     </View>
   );
 }
@@ -80,12 +85,12 @@ export default function AttendanceHistoryScreen({
 
   // Abre já consultando o mês atual e atualiza ao voltar da edição de chamada (HU024).
   useEffect(() => {
-    search();
+    void search();
   }, [studentId, groupId]);
 
   useEffect(() => {
     return navigation.addListener("focus", () => {
-      searchRef.current();
+      void searchRef.current();
     });
   }, [navigation]);
 
@@ -93,34 +98,50 @@ export default function AttendanceHistoryScreen({
 
   return (
     <Page footer={<AdminFooter navigation={navigation} active="Attendance" />}>
-      <Back onPress={navigation.goBack} />
-      <Heading
-        title={studentId ? "FREQUÊNCIA" : "HISTÓRICO DE CHAMADAS"}
-        subtitle={student?.student.name ?? group?.group.name}
-      />
+      <HeaderBand>
+        <Back onPress={navigation.goBack} />
+        <Heading
+          title={studentId ? "FREQUÊNCIA" : "HISTÓRICO DE CHAMADAS"}
+          subtitle={student?.student.name ?? group?.group.name}
+        />
 
-      <Text style={[styles.label, { color: colors.muted }]}>FILTRAR POR PERÍODO</Text>
-      <View style={[styles.row, { alignItems: "flex-start" }]}>
-        <View style={{ flex: 1 }}>
-          <DateField label="De" value={from} onChange={setFrom} />
+        <View style={{ gap: 10 }}>
+          <Text style={styles.label}>FILTRAR POR PERÍODO</Text>
+          <View style={[styles.row, { alignItems: "flex-start" }]}>
+            <View style={{ flex: 1 }}>
+              <DateField label="De" value={from} onChange={setFrom} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <DateField label="Até" value={to} onChange={setTo} />
+            </View>
+          </View>
+          <ErrorMessage message={error} />
+          <Button title={loading ? "CONSULTANDO..." : "CONSULTAR"} disabled={loading} onPress={search} />
         </View>
-        <View style={{ flex: 1 }}>
-          <DateField label="Até" value={to} onChange={setTo} />
-        </View>
-      </View>
-      <ErrorMessage message={error} />
-      <Button title={loading ? "CONSULTANDO..." : "CONSULTAR"} disabled={loading} onPress={search} />
+
+        {group && !loading && (
+          <View style={styles.row}>
+            <TotalCard label="CHAMADAS" value={group.totals.sessions} color={colors.ink} />
+            <TotalCard label="PRESENÇAS" value={group.totals.presences} color={colors.success} />
+            <TotalCard label="FALTAS" value={group.totals.absences} color={colors.error} />
+          </View>
+        )}
+
+        {student && !loading && (
+          <View style={styles.row}>
+            <TotalCard label="PRESENÇAS" value={student.totals.presences} color={colors.success} />
+            <TotalCard label="FALTAS" value={student.totals.absences} color={colors.error} />
+          </View>
+        )}
+      </HeaderBand>
 
       {loading ? (
-        <ActivityIndicator color={colors.ink} />
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
       ) : (
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 12 }}>
           {group && (
             <>
-              <View style={styles.row}>
-                <Total label="CHAMADAS" value={group.totals.sessions} />
-              </View>
-              <Text style={[styles.label, { color: colors.muted }]}>TODAS AS CHAMADAS</Text>
+              <SectionLabel title="TODAS AS CHAMADAS" />
               {group.attendances.map((attendance) => (
                 <Section key={attendance.id}>
                   <Pressable
@@ -132,53 +153,71 @@ export default function AttendanceHistoryScreen({
                         attendanceId: attendance.id,
                       })
                     }
-                    style={({ pressed }) => ({ gap: 12, opacity: pressed ? 0.65 : 1 })}
+                    style={({ pressed }) => ({ gap: 10, opacity: pressed ? 0.65 : 1 })}
                   >
-                    <View style={styles.row}>
-                      <Text style={[styles.text, { flex: 1, fontWeight: "700", fontSize: 16 }]}>
+                    <View style={[styles.row, { justifyContent: "space-between" }]}>
+                      <Text style={[styles.text, { fontWeight: "800", fontSize: 16, color: colors.ink }]}>
                         {attendance.date}
                       </Text>
                       <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
                     </View>
-                    <View style={styles.wrap}>
-                      <Pill tone="ok" text={`${attendance.presences} PRES.`} />
-                      <Pill tone="bad" text={`${attendance.absences} FALT.`} />
+                    <View style={[styles.wrap, { gap: 8 }]}>
+                      <Badge label={`${attendance.presences} PRES.`} tone="green" />
+                      <Badge
+                        label={`${attendance.absences} FALT.`}
+                        tone={attendance.absences > 0 ? "amber" : "gray"}
+                      />
                     </View>
                   </Pressable>
                 </Section>
               ))}
-              {!group.attendances.length && <Text style={styles.muted}>Nenhuma chamada registrada no período.</Text>}
+              {!group.attendances.length && (
+                <View style={[styles.card, { alignItems: "center", paddingVertical: 20 }]}>
+                  <Text style={styles.muted}>Nenhuma chamada registrada no período.</Text>
+                </View>
+              )}
             </>
           )}
 
           {student && (
             <>
-              <View style={styles.row}>
-                <Total label="PRESENÇAS" value={student.totals.presences} color={tones.ok.color} />
-                <Total label="FALTAS" value={student.totals.absences} />
-              </View>
               {student.records.map((record) => (
                 <View
                   key={record.date + record.group.id}
                   style={[
                     styles.card,
                     styles.row,
-                    { padding: 12, backgroundColor: record.present ? colors.paper : tones.bad.background },
+                    {
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      borderRadius: 16,
+                      backgroundColor: record.present ? colors.paper : colors.errorBg,
+                      borderColor: record.present ? colors.border : colors.errorBorder,
+                    },
                   ]}
                 >
                   <MaterialIcons
                     name={record.present ? "check" : "close"}
                     size={18}
-                    color={record.present ? tones.ok.color : tones.bad.color}
+                    color={record.present ? colors.success : colors.error}
                   />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.text, { fontWeight: "700" }]}>{record.date}</Text>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={[styles.text, { fontWeight: "700", fontSize: 15, color: colors.ink }]}>
+                      {record.date}
+                    </Text>
                     <Text style={[styles.muted, { fontSize: 11 }]}>{record.group.name}</Text>
                   </View>
-                  <Pill tone={record.present ? "ok" : "bad"} text={record.present ? "PRESENTE" : "AUSENTE"} />
+                  <Badge
+                    label={record.present ? "PRESENTE" : "AUSENTE"}
+                    tone={record.present ? "green" : "red"}
+                  />
                 </View>
               ))}
-              {!student.records.length && <Text style={styles.muted}>Nenhuma chamada registrada no período.</Text>}
+              {!student.records.length && (
+                <View style={[styles.card, { alignItems: "center", paddingVertical: 20 }]}>
+                  <Text style={styles.muted}>Nenhuma chamada registrada no período.</Text>
+                </View>
+              )}
             </>
           )}
         </View>

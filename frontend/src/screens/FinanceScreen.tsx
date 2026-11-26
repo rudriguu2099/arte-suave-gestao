@@ -3,7 +3,17 @@ import { Text, View, Pressable } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { AdminFooter } from "../components/access";
-import { Back, Button, colors, ErrorMessage, Field, Heading, Page, Select, styles } from "../components/ui";
+import {
+  Button,
+  colors,
+  ErrorMessage,
+  Field,
+  HeaderBand,
+  Heading,
+  Page,
+  Select,
+  styles,
+} from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
 import { formatBirthDate, isSuperAdmin, parseBirthDate } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
@@ -37,7 +47,7 @@ const monthNames = [
 
 const shortMonths = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-type FilterTab = "revenues" | "all" | "expenses" | "pending";
+type FilterTab = "all" | "revenues" | "expenses" | "pending";
 
 function createInitialHistory(month: number, year: number) {
   return Array.from({ length: 6 }, (_, idx) => {
@@ -54,8 +64,8 @@ function categoryOptions(tab: FilterTab) {
       : tab === "expenses" || tab === "pending"
         ? expenseCategories
         : [...revenueCategories, ...expenseCategories].filter(
-          (option, index, all) => all.findIndex((other) => other.value === option.value) === index,
-        );
+            (option, index, all) => all.findIndex((other) => other.value === option.value) === index,
+          );
   return [{ value: "", label: "Todas" }, ...list];
 }
 
@@ -209,34 +219,39 @@ export default function FinanceScreen({
   const listedExpenses = sumCents(filteredEntries.filter((entry) => entry.kind === "expense"));
 
   const tabs: { key: FilterTab; label: string }[] = [
-    { key: "revenues", label: "Receitas" },
-    { key: "all", label: "Todos" },
-    { key: "expenses", label: "Despesas" },
+    { key: "all", label: "TODOS" },
+    { key: "revenues", label: "RECEITAS" },
+    { key: "expenses", label: "DESPESAS" },
     {
       key: "pending",
-      label: data.totals.pendingCount > 0 ? `Pendentes (${data.totals.pendingCount})` : "Pendentes",
+      label: data.totals.pendingCount > 0 ? `PENDENTES (${data.totals.pendingCount})` : "PENDENTES",
     },
   ];
 
   return (
     <Page footer={<AdminFooter navigation={navigation} active="Finance" />}>
-      {/* Bloco superior branco do painel (seguindo o mockup) */}
-      <View
-        style={{
-          marginHorizontal: -24,
-          marginTop: -24,
-          padding: 24,
-          gap: 18,
-          backgroundColor: colors.paper,
-          borderBottomWidth: 1,
-          borderColor: "#E5E5E5",
-        }}
-      >
-        <Back onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Home"))} />
-        <Heading title="FINANÇAS" />
+      <HeaderBand>
+        <Heading
+          title="FINANÇAS"
+          right={
+            <View style={[styles.row, { gap: 8 }]}>
+              <Button
+                title="AJUDA CUSTO"
+                compact
+                secondary
+                onPress={() => navigation.navigate("CostAid")}
+              />
+              <Button
+                title="+ LANÇAMENTO"
+                compact
+                onPress={() => navigation.navigate("FinanceEntry", { date: referenceDate() })}
+              />
+            </View>
+          }
+        />
 
         {/* Seletor de mês/ano */}
-        <View style={[styles.row, { justifyContent: "space-between" }]}>
+        <View style={[styles.row, { justifyContent: "space-between", paddingHorizontal: 4 }]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Mês anterior"
@@ -244,9 +259,9 @@ export default function FinanceScreen({
             onPress={() => changeMonth(-1)}
             style={{ padding: 4 }}
           >
-            <MaterialIcons name="chevron-left" size={22} color={colors.ink} />
+            <MaterialIcons name="chevron-left" size={22} color={colors.muted} />
           </Pressable>
-          <Text style={[styles.text, { fontWeight: "700", fontSize: 16 }]}>
+          <Text style={[styles.text, { fontWeight: "700", fontSize: 16, color: colors.ink }]}>
             {monthNames[month - 1]} {year}
           </Text>
           <Pressable
@@ -256,29 +271,30 @@ export default function FinanceScreen({
             onPress={() => changeMonth(1)}
             style={{ padding: 4 }}
           >
-            <MaterialIcons name="chevron-right" size={22} color={colors.ink} />
+            <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
           </Pressable>
         </View>
 
         <ErrorMessage message={error} />
 
-        {/* Cards de resumo do período: Receitas, Despesas (com pendentes) e Saldo */}
+        {/* Cards de resumo do período: Receitas, Despesas e Saldo */}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           <View style={[styles.card, { flex: 1, minWidth: 96, padding: 12, gap: 6 }]}>
-            <Text style={[styles.label, { color: colors.muted, fontSize: 9 }]}>RECEITAS</Text>
-            <Text style={{ fontSize: 15, fontWeight: "800", color: palette.green }}>
+            <Text style={[styles.label, { fontSize: 9.5 }]}>RECEITAS</Text>
+            <Text style={{ fontSize: 15, fontWeight: "900", color: palette.green }}>
               {formatarReais(data.totals.revenues)}
             </Text>
           </View>
 
           <View style={[styles.card, { flex: 1, minWidth: 96, padding: 12, gap: 4 }]}>
-            <Text style={[styles.label, { color: colors.muted, fontSize: 9 }]}>DESPESAS</Text>
-            <Text style={{ fontSize: 15, fontWeight: "800", color: palette.red }}>
+            <Text style={[styles.label, { fontSize: 9.5 }]}>DESPESAS</Text>
+            <Text style={{ fontSize: 15, fontWeight: "900", color: palette.red }}>
               {formatarReais(data.totals.expenses)}
             </Text>
             <Text
+              numberOfLines={1}
               style={{
-                fontSize: 10,
+                fontSize: 9.5,
                 color: data.totals.pendingCount > 0 ? palette.pendingText : colors.muted,
                 fontWeight: data.totals.pendingCount > 0 ? "700" : "400",
               }}
@@ -290,11 +306,11 @@ export default function FinanceScreen({
           </View>
 
           <View style={[styles.card, { flex: 1, minWidth: 96, padding: 12, gap: 6 }]}>
-            <Text style={[styles.label, { color: colors.muted, fontSize: 9 }]}>SALDO</Text>
+            <Text style={[styles.label, { fontSize: 9.5 }]}>SALDO</Text>
             <Text
               style={{
                 fontSize: 15,
-                fontWeight: "800",
+                fontWeight: "900",
                 color: data.totals.balance < 0 ? palette.red : palette.green,
               }}
             >
@@ -303,18 +319,18 @@ export default function FinanceScreen({
           </View>
         </View>
 
-        {/* Gráfico 1 (Mockup): Histórico 6 Meses — Receita vs Despesa */}
-        <View style={[styles.card, { padding: 16, gap: 14 }]}>
-          <Text style={[styles.label, { color: colors.muted, fontWeight: "700" }]}>HISTÓRICO 6 MESES</Text>
+        {/* Gráfico 1: Histórico 6 Meses — Receita vs Despesa */}
+        <View style={[styles.card, { padding: 16, gap: 12 }]}>
+          <Text style={styles.label}>HISTÓRICO 6 MESES</Text>
           <View
             style={{
               flexDirection: "row",
               alignItems: "flex-end",
               justifyContent: "space-around",
-              height: 112,
+              height: 108,
               paddingTop: 8,
               borderBottomWidth: 1,
-              borderColor: "#EFEFEF",
+              borderColor: colors.divider,
               position: "relative",
             }}
           >
@@ -335,10 +351,10 @@ export default function FinanceScreen({
               </View>
             )}
             {data.history.map((point) => {
-              const expHeight =
-                point.expenses > 0 ? Math.max(5, Math.round((point.expenses / maxHistory) * 96)) : 0;
               const revHeight =
-                point.revenues > 0 ? Math.max(5, Math.round((point.revenues / maxHistory) * 96)) : 0;
+                point.revenues > 0 ? Math.max(5, Math.round((point.revenues / maxHistory) * 92)) : 0;
+              const expHeight =
+                point.expenses > 0 ? Math.max(5, Math.round((point.expenses / maxHistory) * 92)) : 0;
               return (
                 <Pressable
                   key={`${point.year}-${point.month}`}
@@ -347,26 +363,26 @@ export default function FinanceScreen({
                   onPress={() => selectHistoryMonth(point.month, point.year)}
                   style={{ flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end" }}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 3 }}>
-                    {expHeight > 0 && (
-                      <View
-                        style={{
-                          width: 11,
-                          height: expHeight,
-                          backgroundColor: palette.red,
-                          borderTopLeftRadius: 2,
-                          borderTopRightRadius: 2,
-                        }}
-                      />
-                    )}
+                  <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
                     {revHeight > 0 && (
                       <View
                         style={{
-                          width: 11,
+                          width: 12,
                           height: revHeight,
-                          backgroundColor: palette.chartGreen,
-                          borderTopLeftRadius: 2,
-                          borderTopRightRadius: 2,
+                          backgroundColor: palette.chartRevenue,
+                          borderTopLeftRadius: 4,
+                          borderTopRightRadius: 4,
+                        }}
+                      />
+                    )}
+                    {expHeight > 0 && (
+                      <View
+                        style={{
+                          width: 12,
+                          height: expHeight,
+                          backgroundColor: palette.chartExpense,
+                          borderTopLeftRadius: 4,
+                          borderTopRightRadius: 4,
                         }}
                       />
                     )}
@@ -375,7 +391,7 @@ export default function FinanceScreen({
               );
             })}
           </View>
-          <View style={{ flexDirection: "row", justifyContent: "space-around", marginTop: -8 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-around", marginTop: -6 }}>
             {data.history.map((point) => {
               const selected = point.month === month && point.year === year;
               return (
@@ -388,9 +404,9 @@ export default function FinanceScreen({
                   <Text
                     style={{
                       textAlign: "center",
-                      fontSize: 10,
-                      color: selected ? colors.ink : colors.muted,
-                      fontWeight: selected ? "700" : "400",
+                      fontSize: 10.5,
+                      color: selected ? colors.primary : colors.muted,
+                      fontWeight: selected ? "800" : "500",
                     }}
                   >
                     {shortMonths[point.month - 1]}
@@ -401,19 +417,19 @@ export default function FinanceScreen({
           </View>
           <View style={[styles.row, { gap: 18 }]}>
             <View style={[styles.row, { gap: 6 }]}>
-              <View style={{ width: 8, height: 8, backgroundColor: palette.chartGreen }} />
+              <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: palette.chartRevenue }} />
               <Text style={[styles.muted, { fontSize: 11 }]}>Receita</Text>
             </View>
             <View style={[styles.row, { gap: 6 }]}>
-              <View style={{ width: 8, height: 8, backgroundColor: palette.red }} />
+              <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: palette.chartExpense }} />
               <Text style={[styles.muted, { fontSize: 11 }]}>Despesa</Text>
             </View>
           </View>
         </View>
 
-        {/* Gráfico 2 (RF016): Gráfico de Barras do Saldo Mensal (6 Meses) */}
+        {/* Gráfico 2 (RF016): Saldo Mensal (6 Meses) */}
         <View style={[styles.card, { padding: 16, gap: 10 }]}>
-          <Text style={[styles.label, { color: colors.muted, fontWeight: "700" }]}>SALDO — 6 MESES</Text>
+          <Text style={styles.label}>SALDO — 6 MESES</Text>
           <View style={{ flexDirection: "row", justifyContent: "space-around", position: "relative" }}>
             {!hasHistoryData && (
               <View
@@ -452,25 +468,25 @@ export default function FinanceScreen({
                     {positive && (
                       <View
                         style={{
-                          width: 18,
+                          width: 16,
                           height: barHeight,
-                          backgroundColor: palette.chartGreen,
-                          borderTopLeftRadius: 2,
-                          borderTopRightRadius: 2,
+                          backgroundColor: palette.green,
+                          borderTopLeftRadius: 4,
+                          borderTopRightRadius: 4,
                         }}
                       />
                     )}
                   </View>
-                  <View style={{ height: 1, width: "100%", backgroundColor: "#DDDDDD" }} />
+                  <View style={{ height: 1, width: "100%", backgroundColor: colors.divider }} />
                   <View style={{ height: 46, justifyContent: "flex-start", alignItems: "center", width: "100%" }}>
                     {negative && (
                       <View
                         style={{
-                          width: 18,
+                          width: 16,
                           height: barHeight,
                           backgroundColor: palette.red,
-                          borderBottomLeftRadius: 2,
-                          borderBottomRightRadius: 2,
+                          borderBottomLeftRadius: 4,
+                          borderBottomRightRadius: 4,
                         }}
                       />
                     )}
@@ -478,9 +494,9 @@ export default function FinanceScreen({
                   <Text
                     style={{
                       marginTop: 4,
-                      fontSize: 10,
-                      color: selected ? colors.ink : colors.muted,
-                      fontWeight: selected ? "700" : "400",
+                      fontSize: 10.5,
+                      color: selected ? colors.primary : colors.muted,
+                      fontWeight: selected ? "800" : "500",
                     }}
                   >
                     {shortMonths[point.month - 1]}
@@ -491,21 +507,19 @@ export default function FinanceScreen({
           </View>
           <View style={[styles.row, { gap: 18 }]}>
             <View style={[styles.row, { gap: 6 }]}>
-              <View style={{ width: 8, height: 8, backgroundColor: palette.chartGreen }} />
+              <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: palette.green }} />
               <Text style={[styles.muted, { fontSize: 11 }]}>Superávit (+)</Text>
             </View>
             <View style={[styles.row, { gap: 6 }]}>
-              <View style={{ width: 8, height: 8, backgroundColor: palette.red }} />
+              <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: palette.red }} />
               <Text style={[styles.muted, { fontSize: 11 }]}>Déficit (-)</Text>
             </View>
           </View>
         </View>
 
-        {/* Gráfico 3 (RF016): Gráfico de Barras de Despesas do Mês por Categoria e Situação */}
+        {/* Gráfico 3 (RF016): Despesas do Mês por Categoria */}
         <View style={[styles.card, { padding: 16, gap: 12 }]}>
-          <Text style={[styles.label, { color: colors.muted, fontWeight: "700" }]}>
-            DESPESAS DO MÊS POR CATEGORIA
-          </Text>
+          <Text style={styles.label}>DESPESAS DO MÊS POR CATEGORIA</Text>
           {data.expensesByCategory.length ? (
             <>
               <View style={{ gap: 10 }}>
@@ -516,21 +530,21 @@ export default function FinanceScreen({
                     <View
                       key={item.category}
                       accessibilityLabel={`${expenseCategoryLabel(item.category)}: total ${formatarReais(item.total)}, pagas ${formatarReais(item.paid)}, pendentes ${formatarReais(item.pending)}`}
-                      style={{ gap: 4 }}
+                      style={{ gap: 5 }}
                     >
                       <View style={[styles.row, { justifyContent: "space-between" }]}>
                         <Text style={[styles.text, { fontSize: 12, fontWeight: "600", flex: 1 }]}>
                           {expenseCategoryLabel(item.category)}
                         </Text>
-                        <Text style={[styles.muted, { fontSize: 12, color: colors.ink, fontWeight: "700" }]}>
+                        <Text style={[styles.muted, { fontSize: 12, color: colors.ink, fontWeight: "800" }]}>
                           {formatarReais(item.total)}
                         </Text>
                       </View>
                       <View
                         style={{
                           height: 10,
-                          backgroundColor: "#F3F3F3",
-                          borderRadius: 2,
+                          backgroundColor: colors.surface,
+                          borderRadius: 99,
                           overflow: "hidden",
                           flexDirection: "row",
                         }}
@@ -548,11 +562,11 @@ export default function FinanceScreen({
               </View>
               <View style={[styles.row, { gap: 18 }]}>
                 <View style={[styles.row, { gap: 6 }]}>
-                  <View style={{ width: 8, height: 8, backgroundColor: palette.red }} />
+                  <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: palette.red }} />
                   <Text style={[styles.muted, { fontSize: 11 }]}>Paga ({formatarReais(data.totals.paidExpenses)})</Text>
                 </View>
                 <View style={[styles.row, { gap: 6 }]}>
-                  <View style={{ width: 8, height: 8, backgroundColor: palette.amber }} />
+                  <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: palette.amber }} />
                   <Text style={[styles.muted, { fontSize: 11 }]}>
                     Pendente ({formatarReais(data.totals.pendingExpenses)})
                   </Text>
@@ -563,37 +577,12 @@ export default function FinanceScreen({
             <Text style={styles.muted}>Nenhuma despesa registrada em {monthNames[month - 1]}.</Text>
           )}
         </View>
-      </View>
+      </HeaderBand>
 
-      {/* Botões de ação (seção inferior cinza conforme mockup) */}
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <Button title="AJUDA CUSTO" secondary onPress={() => navigation.navigate("CostAid")} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            title="+ LANÇAMENTO"
-            onPress={() => navigation.navigate("FinanceEntry", { date: referenceDate() })}
-          />
-        </View>
-      </View>
-
-      {/* Cabeçalho e filtro segmentado de lançamentos do período */}
+      {/* Filtros de tipo em pílulas + filtros avançados (HU022) */}
       <View style={{ gap: 12 }}>
-        <View style={[styles.wrap, { justifyContent: "space-between", gap: 10 }]}>
-          <Text style={[styles.heading, { fontSize: 18 }]}>{applied ? "Lançamentos Filtrados" : "Últimos Lançamentos"}</Text>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              backgroundColor: palette.pillTrack,
-              borderRadius: 18,
-              padding: 3,
-              borderWidth: 1,
-              borderColor: colors.border,
-              gap: 2,
-            }}
-          >
+        <View style={[styles.wrap, { justifyContent: "space-between", gap: 8 }]}>
+          <View style={[styles.wrap, { gap: 8 }]}>
             {tabs.map((tab) => {
               const active = filter === tab.key;
               return (
@@ -603,17 +592,20 @@ export default function FinanceScreen({
                   accessibilityState={{ selected: active }}
                   onPress={() => changeTab(tab.key)}
                   style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    borderRadius: 14,
-                    backgroundColor: active ? colors.paper : "transparent",
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active ? colors.primary : colors.paper,
                   }}
                 >
                   <Text
                     style={{
                       fontSize: 11,
-                      fontWeight: active ? "700" : "500",
-                      color: active ? colors.ink : colors.muted,
+                      fontWeight: "800",
+                      letterSpacing: 0.8,
+                      color: active ? colors.paper : colors.muted,
                     }}
                   >
                     {tab.label}
@@ -623,22 +615,39 @@ export default function FinanceScreen({
             })}
           </View>
 
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showFilters }}
+            onPress={() => setShowFilters((open) => !open)}
+            style={[
+              styles.row,
+              {
+                gap: 4,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 999,
+                backgroundColor: applied ? colors.primarySoft : colors.paper,
+                borderWidth: 1,
+                borderColor: applied ? colors.primaryBorder : colors.border,
+              },
+            ]}
+          >
+            <MaterialIcons name="filter-list" size={16} color={applied ? colors.primary : colors.muted} />
+            <Text
+              style={{
+                fontSize: 10.5,
+                fontWeight: "800",
+                letterSpacing: 0.6,
+                color: applied ? colors.primary : colors.muted,
+              }}
+            >
+              {applied ? "FILTROS ATIVOS" : "FILTROS"}
+            </Text>
+          </Pressable>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded: showFilters }}
-          onPress={() => setShowFilters((open) => !open)}
-          style={[styles.row, { alignSelf: "flex-end", gap: 4 }]}
-        >
-          <MaterialIcons name="filter-list" size={18} color={applied ? colors.ink : colors.muted} />
-          <Text style={{ fontSize: 11, fontWeight: "800", letterSpacing: 0.6, color: applied ? colors.ink : colors.muted }}>
-            {applied ? "FILTROS ATIVOS" : "FILTROS"}
-          </Text>
-        </Pressable>
-
         {showFilters && (
-          <View style={[styles.card, { padding: 14, gap: 12 }]}>
+          <View style={[styles.card, { padding: 16, gap: 12 }]}>
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Field
@@ -682,7 +691,7 @@ export default function FinanceScreen({
           </Text>
         )}
 
-        {/* Lista de cards de lançamentos do mês selecionado ou do histórico filtrado (HU022) */}
+        {/* Lista de cards de lançamentos */}
         {loading || historyLoading ? (
           <Text style={styles.muted}>Carregando...</Text>
         ) : filteredEntries.length ? (
@@ -696,17 +705,19 @@ export default function FinanceScreen({
             ))}
           </View>
         ) : (
-          <Text style={styles.muted}>
-            {applied
-              ? "Nenhum lançamento encontrado para os filtros selecionados"
-              : filter === "pending"
-                ? "Nenhuma despesa pendente neste mês."
-                : filter === "revenues"
-                  ? "Nenhuma receita registrada neste mês."
-                  : filter === "expenses"
-                    ? "Nenhuma despesa registrada neste mês."
-                    : "Nenhum lançamento registrado neste mês."}
-          </Text>
+          <View style={[styles.card, { alignItems: "center", paddingVertical: 22 }]}>
+            <Text style={styles.muted}>
+              {applied
+                ? "Nenhum lançamento encontrado para os filtros selecionados"
+                : filter === "pending"
+                  ? "Nenhuma despesa pendente neste mês."
+                  : filter === "revenues"
+                    ? "Nenhuma receita registrada neste mês."
+                    : filter === "expenses"
+                      ? "Nenhuma despesa registrada neste mês."
+                      : "Nenhum lançamento registrado neste mês."}
+            </Text>
+          </View>
         )}
       </View>
     </Page>
