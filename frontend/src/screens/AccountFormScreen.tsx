@@ -68,6 +68,7 @@ export default function AccountFormScreen({
   );
   const [groupId, setGroupId] = useState(student?.groupId ?? "");
   const [guardianId, setGuardianId] = useState(student?.guardianId ?? "");
+  const lockedAthlete = defaultRole === "athlete" || !!student;
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -169,48 +170,52 @@ export default function AccountFormScreen({
         <Heading
           title={pageTitle}
           subtitle={
-            isSuperAdmin(current)
-              ? "Cadastro unificado de administradores, responsáveis e atletas."
-              : "Cadastro de responsáveis e atletas."
+            lockedAthlete
+              ? undefined
+              : isSuperAdmin(current)
+                ? "Cadastro unificado de administradores, responsáveis e atletas."
+                : "Cadastro de responsáveis e atletas."
           }
         />
       </HeaderBand>
 
-      <Section title="Função">
-        {existing?.isSuperAdmin ? (
-          <View style={{ gap: 6 }}>
-            <Badge label="SUPERADMIN" tone="purple" />
-            <Text style={styles.muted}>Perfil definido no banco de dados.</Text>
-          </View>
-        ) : (
-          <Select
-            label="Função *"
-            value={role}
-            options={Object.entries(roleLabels)
-              .filter(([value]) => canManageProfile(current, value as Role))
-              .map(([value, label]) => ({
-                value,
-                label,
-              }))}
-            onChange={(value) => {
-              setRole(value as Role);
-              setError("");
-            }}
-          />
-        )}
-        {role === "admin" && !existing?.isSuperAdmin && (
-          <Text style={styles.muted}>
-            Acesso a turmas, alunos, frequência e gestão de responsáveis e atletas.
-            Não pode gerenciar administradores, financeiro ou cadastro de eventos.
-          </Text>
-        )}
-        {role === "responsible" && (
-          <Text style={styles.muted}>
-            O responsável recebe uma conta e senha inicial. Os alunos menores
-            serão vinculados pelo cadastro de perfil de atleta.
-          </Text>
-        )}
-      </Section>
+      {!lockedAthlete && (
+        <Section title="Função">
+          {existing?.isSuperAdmin ? (
+            <View style={{ gap: 6 }}>
+              <Badge label="SUPERADMIN" tone="purple" />
+              <Text style={styles.muted}>Perfil definido no banco de dados.</Text>
+            </View>
+          ) : (
+            <Select
+              label="Função *"
+              value={role}
+              options={Object.entries(roleLabels)
+                .filter(([value]) => canManageProfile(current, value as Role))
+                .map(([value, label]) => ({
+                  value,
+                  label,
+                }))}
+              onChange={(value) => {
+                setRole(value as Role);
+                setError("");
+              }}
+            />
+          )}
+          {role === "admin" && !existing?.isSuperAdmin && (
+            <Text style={styles.muted}>
+              Acesso a turmas, alunos, frequência e gestão de responsáveis e atletas.
+              Não pode gerenciar administradores, financeiro ou cadastro de eventos.
+            </Text>
+          )}
+          {role === "responsible" && (
+            <Text style={styles.muted}>
+              O responsável recebe uma conta e senha inicial. Os alunos menores
+              serão vinculados pelo cadastro de perfil de atleta.
+            </Text>
+          )}
+        </Section>
+      )}
 
       <Section title={role === "athlete" ? "Dados do atleta" : "Dados do titular"}>
         <Field
@@ -239,11 +244,10 @@ export default function AccountFormScreen({
       </Section>
 
       {role === "athlete" && (
-        <Section title="Turma e vínculo">
+        <Section title="Turma">
           <Select
             label="Turma *"
             value={groupId}
-            // Turma inativa não recebe alunos novos; quem já está nela continua podendo ser editado.
             options={groups
               .filter((group) => group.active || group.id === student?.groupId)
               .map((group) => ({
@@ -267,40 +271,32 @@ export default function AccountFormScreen({
               </Text>
             </View>
           )}
-          {minor ? (
-            <>
-              <Select
-                label="Responsável legal *"
-                value={guardianId}
-                options={guardians.map((account) => ({
-                  value: account.id,
-                  label: account.phones[0]
-                    ? `${account.name} — ${account.phones[0]}`
-                    : account.name,
-                }))}
-                onChange={setGuardianId}
-              />
-              {!guardians.length && (
-                <Text accessibilityRole="alert" style={[styles.muted, { color: colors.error }]}>
-                  Nenhum responsável ativo disponível. Cancele este cadastro e
-                  cadastre primeiro um perfil de Responsável em Contas de Acesso.
-                </Text>
-              )}
-              <Text style={styles.muted}>
-                Menores de 18 anos não recebem conta ou senha própria. O acesso
-                às informações será pela conta do responsável selecionado.
-              </Text>
-            </>
-          ) : age >= 18 ? (
-            <Text style={styles.muted}>
-              A partir de 18 anos, o atleta recebe conta própria e é cadastrado
-              automaticamente como aluno.
-            </Text>
-          ) : (
-            <Text style={styles.muted}>
-              Informe o nascimento para definir o acesso do atleta.
+        </Section>
+      )}
+
+      {minor && (
+        <Section title="Responsável legal">
+          <Select
+            label="Responsável legal *"
+            value={guardianId}
+            options={guardians.map((account) => ({
+              value: account.id,
+              label: account.phones[0]
+                ? `${account.name} — ${account.phones[0]}`
+                : account.name,
+            }))}
+            onChange={setGuardianId}
+          />
+          {!guardians.length && (
+            <Text accessibilityRole="alert" style={[styles.muted, { color: colors.error }]}>
+              Nenhum responsável ativo disponível. Cancele este cadastro e
+              cadastre primeiro um perfil de Responsável em Contas de Acesso.
             </Text>
           )}
+          <Text style={styles.muted}>
+            Menores de 18 anos não recebem conta ou senha própria. O acesso
+            às informações será pela conta do responsável selecionado.
+          </Text>
         </Section>
       )}
 

@@ -262,7 +262,7 @@ export default function CostAidScreen({
       </View>
 
       <View style={{ marginTop: "auto", paddingTop: 8 }}>
-        <Button title="REGISTRAR NOVA DOAÇÃO" onPress={() => openCostAidEntry()} />
+        <Button title="REGISTRAR NOVA AJUDA" onPress={() => openCostAidEntry()} />
       </View>
     </Page>
   );

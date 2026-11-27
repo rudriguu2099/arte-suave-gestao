@@ -143,7 +143,7 @@ export default function LoginScreen() {
               cardYRef.current = event.nativeEvent.layout.y;
             }}
           >
-            <Text style={styles.secao}>BEM-VINDO DE VOLTA</Text>
+            <Text style={styles.secao}>BEM-VINDO</Text>
 
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>E-MAIL</Text>
