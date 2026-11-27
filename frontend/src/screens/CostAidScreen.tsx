@@ -3,7 +3,18 @@ import { Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { AdminFooter } from "../components/access";
-import { Back, Button, colors, ErrorMessage, Heading, Page, styles } from "../components/ui";
+import {
+  Back,
+  Button,
+  colors,
+  Dialog,
+  ErrorMessage,
+  HeaderBand,
+  Heading,
+  Page,
+  SectionLabel,
+  styles,
+} from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
 import { isSuperAdmin } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
@@ -36,6 +47,8 @@ export default function CostAidScreen({
   const [data, setData] = useState<CostAidResponse>({ month, year, contributed: [], pending: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [undoTarget, setUndoTarget] = useState<CostAidResponse["contributed"][number] | null>(null);
+  const [undoing, setUndoing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,121 +101,125 @@ export default function CostAidScreen({
     });
   }
 
+  async function confirmUndo() {
+    if (!undoTarget || undoing) return;
+    setUndoing(true);
+    setError("");
+    try {
+      await financeApi.removeRevenue(getToken(), undoTarget.revenueId);
+      setUndoTarget(null);
+      await load();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) return signOut();
+      setUndoTarget(null);
+      setError((e as Error).message);
+    } finally {
+      setUndoing(false);
+    }
+  }
+
   return (
     <Page footer={<AdminFooter navigation={navigation} active="Finance" />}>
-      <Back onPress={navigation.goBack} />
-      <Heading title="AJUDA DE CUSTO" />
+      <Dialog
+        visible={!!undoTarget}
+        title="Desfazer contribuição?"
+        message={
+          undoTarget
+            ? `Deseja remover a ajuda de custo registrada de ${undoTarget.name} em ${monthNames[month - 1]} ${year}?`
+            : ""
+        }
+        confirmLabel="DESFAZER"
+        danger
+        busy={undoing}
+        onConfirm={confirmUndo}
+        onClose={() => setUndoTarget(null)}
+      />
 
-      <View style={[styles.row, { justifyContent: "space-between" }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Mês anterior"
-          hitSlop={10}
-          onPress={() => changeMonth(-1)}
-          style={{ padding: 4 }}
-        >
-          <MaterialIcons name="chevron-left" size={20} color={colors.ink} />
-        </Pressable>
-        <Text style={[styles.text, { fontWeight: "700" }]}>
-          {monthNames[month - 1]} {year}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Próximo mês"
-          hitSlop={10}
-          onPress={() => changeMonth(1)}
-          style={{ padding: 4 }}
-        >
-          <MaterialIcons name="chevron-right" size={20} color={colors.ink} />
-        </Pressable>
-      </View>
+      <HeaderBand>
+        <Back onPress={navigation.goBack} />
+        <Heading title="AJUDA DE CUSTO" />
 
-      <View style={styles.row}>
-        <View style={[styles.card, styles.row, { flex: 1, justifyContent: "space-between", padding: 14 }]}>
-          <View style={{ gap: 2 }}>
-            <Text style={[styles.heading, { fontSize: 20 }]}>{data.contributed.length}</Text>
-            <Text style={[styles.label, { color: colors.muted, fontSize: 9 }]}>CONTRIBUÍRAM</Text>
-          </View>
-          <View
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 4,
-              backgroundColor: "#0CC50C",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+        <View style={[styles.row, { justifyContent: "space-between", paddingHorizontal: 4 }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mês anterior"
+            hitSlop={10}
+            onPress={() => changeMonth(-1)}
+            style={{ padding: 4 }}
           >
-            <MaterialIcons name="north-east" size={16} color={colors.paper} />
-          </View>
+            <MaterialIcons name="chevron-left" size={22} color={colors.muted} />
+          </Pressable>
+          <Text style={[styles.text, { fontWeight: "700", fontSize: 16, color: colors.ink }]}>
+            {monthNames[month - 1]} {year}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Próximo mês"
+            hitSlop={10}
+            onPress={() => changeMonth(1)}
+            style={{ padding: 4 }}
+          >
+            <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
         </View>
 
-        <View style={[styles.card, styles.row, { flex: 1, justifyContent: "space-between", padding: 14 }]}>
-          <View style={{ gap: 2 }}>
-            <Text style={[styles.heading, { fontSize: 20 }]}>{data.pending.length}</Text>
-            <Text style={[styles.label, { color: colors.muted, fontSize: 9 }]}>PENDENTES</Text>
+        <View style={styles.row}>
+          <View style={[styles.card, { flex: 1, paddingVertical: 16, gap: 4 }]}>
+            <Text style={{ fontSize: 28, fontWeight: "900", color: colors.success }}>
+              {data.contributed.length}
+            </Text>
+            <Text style={styles.label}>CONTRIBUÍRAM</Text>
           </View>
-          <View
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 4,
-              backgroundColor: "#D80000",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <MaterialIcons name="south-west" size={16} color={colors.paper} />
+
+          <View style={[styles.card, { flex: 1, paddingVertical: 16, gap: 4 }]}>
+            <Text style={{ fontSize: 28, fontWeight: "900", color: colors.warning }}>
+              {data.pending.length}
+            </Text>
+            <Text style={styles.label}>PENDENTES</Text>
           </View>
         </View>
-      </View>
+      </HeaderBand>
 
       <ErrorMessage message={error} />
 
       <View style={{ gap: 10 }}>
-        <Text style={[styles.label, { color: colors.muted, fontWeight: "700" }]}>PENDENTES</Text>
+        <SectionLabel title="PENDENTES" />
         {loading ? (
           <Text style={styles.muted}>Carregando...</Text>
         ) : data.pending.length ? (
           data.pending.map((student) => (
-            <Pressable
+            <View
               key={student.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Registrar ajuda de custo de ${student.name}`}
-              onPress={() => openCostAidEntry(student.id)}
-              style={({ pressed }) => [
+              style={[
                 styles.card,
                 styles.row,
                 {
                   justifyContent: "space-between",
-                  paddingHorizontal: 14,
-                  paddingVertical: 10,
-                  opacity: pressed ? 0.7 : 1,
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  borderColor: colors.warningBorder,
                 },
               ]}
             >
-              <Text style={[styles.text, { fontWeight: "600", flex: 1 }]}>{student.name}</Text>
-              <View
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 4,
-                  backgroundColor: "#D80000",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <MaterialIcons name="south-west" size={16} color={colors.paper} />
-              </View>
-            </Pressable>
+              <Text style={[styles.text, { fontWeight: "700", fontSize: 15, color: colors.ink, flex: 1 }]}>
+                {student.name}
+              </Text>
+              <Button
+                title="REGISTRAR"
+                compact
+                onPress={() => openCostAidEntry(student.id)}
+              />
+            </View>
           ))
         ) : (
-          <Text style={styles.muted}>Nenhum atleta pendente neste mês.</Text>
+          <View style={[styles.card, { alignItems: "center", paddingVertical: 18 }]}>
+            <Text style={styles.muted}>Nenhum atleta pendente neste mês.</Text>
+          </View>
         )}
       </View>
 
       <View style={{ gap: 10 }}>
-        <Text style={[styles.label, { color: colors.muted, fontWeight: "700" }]}>CONTRIBUÍRAM</Text>
+        <SectionLabel title="CONTRIBUÍRAM" />
         {loading ? (
           <Text style={styles.muted}>Carregando...</Text>
         ) : data.contributed.length ? (
@@ -212,32 +229,40 @@ export default function CostAidScreen({
               style={[
                 styles.card,
                 styles.row,
-                { justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10 },
+                {
+                  justifyContent: "space-between",
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  borderColor: colors.successBorder,
+                },
               ]}
             >
-              <Text style={[styles.text, { fontWeight: "600", flex: 1 }]}>{student.name}</Text>
-              <View
-                accessibilityLabel={`${student.name}: contribuiu`}
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 4,
-                  backgroundColor: "#0CC50C",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <MaterialIcons name="north-east" size={16} color={colors.paper} />
+              <View style={[styles.row, { flex: 1, gap: 10 }]}>
+                <MaterialIcons name="check" size={18} color={colors.success} />
+                <Text
+                  accessibilityLabel={`${student.name}: contribuiu`}
+                  style={[styles.text, { fontWeight: "700", fontSize: 15, color: colors.ink, flex: 1 }]}
+                >
+                  {student.name}
+                </Text>
               </View>
+              <Button
+                title="DESFAZER"
+                compact
+                danger
+                onPress={() => setUndoTarget(student)}
+              />
             </View>
           ))
         ) : (
-          <Text style={styles.muted}>Nenhuma contribuição registrada neste mês.</Text>
+          <View style={[styles.card, { alignItems: "center", paddingVertical: 18 }]}>
+            <Text style={styles.muted}>Nenhuma contribuição registrada neste mês.</Text>
+          </View>
         )}
       </View>
 
-      <View style={{ marginTop: "auto", paddingTop: 12 }}>
-        <Button title="REGISTRAR NOVA DOAÇÃO" onPress={() => openCostAidEntry()} />
+      <View style={{ marginTop: "auto", paddingTop: 8 }}>
+        <Button title="REGISTRAR NOVA AJUDA" onPress={() => openCostAidEntry()} />
       </View>
     </Page>
   );

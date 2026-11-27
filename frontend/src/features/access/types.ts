@@ -87,8 +87,13 @@ export type EditableFinanceEntry = {
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
+  Notifications: undefined;
   Accounts: undefined;
-  AccountForm: ProfileTarget | undefined;
+  Responsibles: undefined;
+  AccountForm:
+    | (ProfileTarget & { defaultRole?: never })
+    | { defaultRole?: Role; accountId?: never; athleteId?: never }
+    | undefined;
   Password: { accountId?: string } | undefined;
   Groups: undefined;
   GroupForm: { groupId: string } | undefined;
@@ -103,7 +108,6 @@ export type RootStackParamList = {
       }
     | undefined;
   CostAid: undefined;
-  Events: undefined;
   Students: { groupId?: string } | undefined;
   Attendance: undefined;
   AttendanceForm: { groupId: string; attendanceId?: string };

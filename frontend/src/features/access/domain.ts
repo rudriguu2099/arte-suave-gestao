@@ -137,3 +137,38 @@ export function canChangePassword(
   return !!actor?.active && (actor.id === accountId || isSuperAdmin(actor) ||
     (targetRole !== undefined && canManageProfile(actor, targetRole)));
 }
+
+const costAidMessages = [
+  {
+    hour: 9,
+    title: "Ajude o projeto a continuar 🥋",
+    body: "O período de contribuição da ajuda de custo vai do dia 5 ao dia 10. Sua ajuda faz a diferença! Se já contribuiu, obrigado e desconsidere.",
+  },
+  {
+    hour: 19,
+    title: "Lembrete: ajuda de custo 🥋",
+    body: "Ainda dá tempo de contribuir até o dia 10. Sua ajuda faz a diferença! Se já contribuiu este mês, obrigado e desconsidere.",
+  },
+];
+
+export function costAidReminders(account: Account | null) {
+  if (!account?.active || account.role === "admin") return [];
+  return [5, 6, 7, 8, 9, 10].flatMap((day) =>
+    costAidMessages.map(({ hour, title, body }) => ({ day, hour, title, body })),
+  );
+}
+
+const costAidMonths = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+export function costAidReminderCard(account: Account | null, today = new Date()) {
+  const day = today.getDate();
+  if (!costAidReminders(account).length || day < 5 || day > 10) return null;
+  return {
+    id: `cost-aid-${today.getFullYear()}-${today.getMonth() + 1}`,
+    title: `Lembrete: Ajuda de custo — ${costAidMonths[today.getMonth()]}`,
+    body: "O período de contribuição mensal (R$ 30,00) está em andamento. Contribua com a manutenção do projeto.",
+  };
+}

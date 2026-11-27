@@ -4,18 +4,19 @@ import HomeScreen from "../screens/HomeScreen";
 import LoginScreen from "../screens/LoginScreen";
 import AccountsScreen from "../screens/AccountsScreen";
 import AccountFormScreen from "../screens/AccountFormScreen";
+import ResponsiblesScreen from "../screens/ResponsiblesScreen";
 import PasswordScreen from "../screens/PasswordScreen";
-import { EventsScreen } from "../screens/ReferenceScreens";
 import { AttendanceFormScreen, AttendanceScreen } from "../screens/AttendanceScreen";
 import AttendanceHistoryScreen from "../screens/AttendanceHistoryScreen";
 import { GroupFormScreen, GroupsScreen } from "../screens/GroupsScreen";
-import AtletasScreen from '../screens/AtletasScreen';
+import AtletasScreen from "../screens/AtletasScreen";
 import FinanceScreen from "../screens/FinanceScreen";
 import FinanceEntryScreen from "../screens/FinanceEntryScreen";
 import CostAidScreen from "../screens/CostAidScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
 import { useAccess } from "../features/access/AccessContext";
 import { isStaff, isSuperAdmin } from "../features/access/domain";
-import type { RootStackParamList } from "./types";
+import type { RootStackParamList } from "../features/access/types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -25,7 +26,7 @@ export default function Routes() {
     <NavigationContainer>
       <Stack.Navigator
         key={current ? current.id + "-" + current.role + "-" + current.isSuperAdmin : "guest"}
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#F3F3F3" } }}
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#F6F4FA" } }}
       >
         {!current ? (
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -36,6 +37,8 @@ export default function Routes() {
             {isStaff(current) && (
               <>
                 <Stack.Screen name="Accounts" component={AccountsScreen} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                <Stack.Screen name="Responsibles" component={ResponsiblesScreen} />
                 <Stack.Screen name="AccountForm" component={AccountFormScreen} />
                 <Stack.Screen name="Groups" component={GroupsScreen} />
                 <Stack.Screen name="GroupForm" component={GroupFormScreen} />
@@ -50,7 +53,6 @@ export default function Routes() {
                 <Stack.Screen name="Finance" component={FinanceScreen} />
                 <Stack.Screen name="FinanceEntry" component={FinanceEntryScreen} />
                 <Stack.Screen name="CostAid" component={CostAidScreen} />
-                <Stack.Screen name="Events" component={EventsScreen} />
               </>
             )}
           </>

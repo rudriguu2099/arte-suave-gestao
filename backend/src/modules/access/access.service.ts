@@ -370,6 +370,15 @@ export class AccessService {
           throw new BadRequestException(
             'O superadmin não pode ser inativado pela aplicação.',
           );
+        if (
+          account.isActive &&
+          account.role === Role.RESPONSAVEL &&
+          (await tx.student.count({ where: { guardianId: account.id } }))
+        ) {
+          throw new BadRequestException(
+            'Este responsável possui atletas vinculados. Reatribua os atletas antes de inativá-lo.',
+          );
+        }
         await tx.user.update({
           where: { id: account.id },
           data: { isActive: !account.isActive, tokenVersion: { increment: 1 } },

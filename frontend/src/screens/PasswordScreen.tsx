@@ -6,12 +6,14 @@ import {
   Back,
   Button,
   Check,
-  ErrorMessage,
   Dialog,
+  ErrorMessage,
   Field,
+  HeaderBand,
   Heading,
   Page,
   Section,
+  SectionLabel,
   styles,
 } from "../components/ui";
 import { useAccess } from "../features/access/AccessContext";
@@ -33,6 +35,7 @@ export default function PasswordScreen({
   const targetId = route.params?.accountId ?? current?.id;
   const target = accounts.find((account) => account.id === targetId);
   const other = targetId !== current?.id;
+
   if (!current || !target || !canChangePassword(current, target.id, target.role))
     return (
       <Page>
@@ -40,6 +43,7 @@ export default function PasswordScreen({
         <ErrorMessage message="Conta indisponível para alteração de senha." />
       </Page>
     );
+
   async function save() {
     if (saving) return;
     setSaving(true);
@@ -55,6 +59,7 @@ export default function PasswordScreen({
       setSaving(false);
     }
   }
+
   return (
     <Page>
       <Dialog
@@ -63,80 +68,76 @@ export default function PasswordScreen({
         message="A nova senha foi salva. O usuário deverá entrar novamente."
         onClose={() => navigation.goBack()}
       />
-      <Back onPress={navigation.goBack} />
-      <Heading
-        title={other ? "REDEFINIR SENHA" : "ALTERAR MINHA SENHA"}
-        subtitle={
-          other
-            ? `Conta de ${target.name}. Não exige confirmação por e-mail.`
-            : "Você pode alterar sua senha quando quiser."
-        }
-      />
-      <View style={{ marginTop: 44 }}>
-        <Section>
-          <View style={{ alignItems: "center", marginVertical: 10 }}>
-            <Text style={styles.heading}>Criar nova senha</Text>
-            <View style={styles.titleRule} />
-          </View>
-          {!other && (
-            <Field
-              label="Senha atual *"
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              maxLength={LIMITE_SENHA}
-            secureTextEntry={!visible}
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="password"
-            />
-          )}
+      <HeaderBand>
+        <Back onPress={navigation.goBack} />
+        <Heading
+          title={other ? "REDEFINIR SENHA" : "ALTERAR MINHA SENHA"}
+          subtitle={
+            other
+              ? `Conta de ${target.name}. Não exige confirmação por e-mail.`
+              : "Você pode alterar sua senha quando quiser."
+          }
+        />
+      </HeaderBand>
+
+      <Section>
+        <SectionLabel dash title={other ? "CRIAR NOVA SENHA" : "ALTERAR SENHA"} />
+        {!other && (
           <Field
-            label="Nova senha *"
-            value={password}
-            onChangeText={setPassword}
+            label="Senha atual *"
+            placeholder="••••••"
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
             maxLength={LIMITE_SENHA}
             secureTextEntry={!visible}
             autoCapitalize="none"
             autoCorrect={false}
-            textContentType="newPassword"
+            textContentType="password"
           />
-          <Field
-            label="Repita a senha *"
-            value={confirmation}
-            onChangeText={setConfirmation}
-            maxLength={LIMITE_SENHA}
-            secureTextEntry={!visible}
-            autoCapitalize="none"
-            autoCorrect={false}
-            textContentType="newPassword"
+        )}
+        <Field
+          label="Nova senha *"
+          placeholder="••••••"
+          value={password}
+          onChangeText={setPassword}
+          maxLength={LIMITE_SENHA}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="newPassword"
+        />
+        <Field
+          label="Confirmar nova senha *"
+          placeholder="••••••"
+          value={confirmation}
+          onChangeText={setConfirmation}
+          maxLength={LIMITE_SENHA}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="newPassword"
+        />
+        <Text style={styles.muted}>
+          Use de 6 a 16 caracteres, com maiúscula, minúscula, número e símbolo.
+        </Text>
+        <Check label="Mostrar senhas" value={visible} onChange={setVisible} />
+        <ErrorMessage message={error} />
+        <View style={[styles.row, { marginTop: 8 }]}>
+          <Button
+            title="CANCELAR"
+            secondary
+            disabled={saving}
+            onPress={navigation.goBack}
           />
-          <Text style={styles.muted}>Use de 6 a 16 caracteres, com maiúscula, minúscula, número e símbolo.</Text>
-          <Check label="Mostrar senhas" value={visible} onChange={setVisible} />
-          <ErrorMessage message={error} />
-          <View
-            style={[
-              styles.row,
-              {
-                justifyContent: "space-between",
-                marginTop: 24,
-                flexWrap: "wrap",
-              },
-            ]}
-          >
+          <View style={{ flex: 1 }}>
             <Button
-              title="CANCELAR"
-              secondary
-              disabled={saving}
-              onPress={navigation.goBack}
-            />
-            <Button
-              title={saving ? "SALVANDO..." : other ? "REDEFINIR" : "ALTERAR"}
+              title={saving ? "SALVANDO..." : other ? "REDEFINIR SENHA" : "ALTERAR SENHA"}
               disabled={saving}
               onPress={save}
             />
           </View>
-        </Section>
-      </View>
+        </View>
+      </Section>
     </Page>
   );
 }
