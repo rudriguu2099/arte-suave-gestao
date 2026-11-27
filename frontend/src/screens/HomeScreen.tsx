@@ -23,7 +23,7 @@ import {
   type UserTab,
 } from "../components/access";
 import { useAccess } from "../features/access/AccessContext";
-import { ageOn, isStaff, isSuperAdmin } from "../features/access/domain";
+import { ageOn, costAidReminderCard, isStaff, isSuperAdmin } from "../features/access/domain";
 import { roleLabels, type RootStackParamList } from "../features/access/types";
 import { ApiError } from "../services/api";
 import { getMyAttendance, type AthleteMonthlyAttendance } from "../services/attendance";
@@ -32,6 +32,7 @@ import {
   financeApi,
   type FinanceExpenseEntry,
 } from "../services/finance";
+import { markSeen, wasSeen } from "../services/notificationSeen";
 import { LIMITE_SENHA, formatarReais } from "../utils/validators";
 
 const monthNames = [
@@ -133,6 +134,27 @@ export default function HomeScreen({
     });
   }, [navigation, loadPendingExpenses, loadAttendance]);
 
+  // Lembrete da ajuda de custo: o contador some depois que a conta vê a aba Notificações.
+  const reminder = costAidReminderCard(current);
+  const [reminderSeen, setReminderSeen] = useState(true);
+
+  useEffect(() => {
+    if (!current || !reminder) return;
+    let cancelled = false;
+    void wasSeen(current.id, reminder.id).then((seen) => {
+      if (!cancelled) setReminderSeen(seen);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [current?.id, reminder?.id]);
+
+  useEffect(() => {
+    if (userTab !== "notifications" || !current || !reminder || reminderSeen) return;
+    setReminderSeen(true);
+    void markSeen(current.id, reminder.id);
+  }, [userTab, current?.id, reminder?.id, reminderSeen]);
+
   if (!current) return null;
 
   function changeMonth(delta: number) {
@@ -225,7 +247,7 @@ export default function HomeScreen({
         admin ? (
           <AdminFooter navigation={navigation} active="Home" />
         ) : (
-          <UserFooter active={userTab} onSelect={setUserTab} notificationCount={events.length} />
+          <UserFooter active={userTab} onSelect={setUserTab} notificationCount={events.length + (reminder && !reminderSeen ? 1 : 0)} />
         )
       }
     >
@@ -243,6 +265,47 @@ export default function HomeScreen({
               {current.name}
             </Text>
           </View>
+          {admin && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                events.length ? `Notificações, ${events.length} novas` : "Notificações"
+              }
+              onPress={() => navigation.navigate("Notifications")}
+              hitSlop={10}
+              style={({ pressed }) => ({
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: colors.primarySoft,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <MaterialIcons name="notifications-none" size={22} color={colors.primary} />
+              {events.length > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -2,
+                    right: -2,
+                    minWidth: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    paddingHorizontal: 4,
+                    backgroundColor: colors.error,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ color: colors.paper, fontSize: 9, fontWeight: "800" }}>
+                    {events.length}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Sair da sessão"

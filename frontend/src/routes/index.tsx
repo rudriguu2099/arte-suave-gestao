@@ -13,9 +13,10 @@ import AtletasScreen from "../screens/AtletasScreen";
 import FinanceScreen from "../screens/FinanceScreen";
 import FinanceEntryScreen from "../screens/FinanceEntryScreen";
 import CostAidScreen from "../screens/CostAidScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
 import { useAccess } from "../features/access/AccessContext";
 import { isStaff, isSuperAdmin } from "../features/access/domain";
-import type { RootStackParamList } from "./types";
+import type { RootStackParamList } from "../features/access/types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -36,6 +37,7 @@ export default function Routes() {
             {isStaff(current) && (
               <>
                 <Stack.Screen name="Accounts" component={AccountsScreen} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="Responsibles" component={ResponsiblesScreen} />
                 <Stack.Screen name="AccountForm" component={AccountFormScreen} />
                 <Stack.Screen name="Groups" component={GroupsScreen} />

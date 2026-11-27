@@ -157,3 +157,18 @@ export function costAidReminders(account: Account | null) {
     costAidMessages.map(({ hour, title, body }) => ({ day, hour, title, body })),
   );
 }
+
+const costAidMonths = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+export function costAidReminderCard(account: Account | null, today = new Date()) {
+  const day = today.getDate();
+  if (!costAidReminders(account).length || day < 5 || day > 10) return null;
+  return {
+    id: `cost-aid-${today.getFullYear()}-${today.getMonth() + 1}`,
+    title: `Lembrete: Ajuda de custo — ${costAidMonths[today.getMonth()]}`,
+    body: "O período de contribuição mensal (R$ 30,00) está em andamento. Contribua com a manutenção do projeto.",
+  };
+}

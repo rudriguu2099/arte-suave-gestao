@@ -3,7 +3,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { colors, styles } from "./ui";
 import { useAccess } from "../features/access/AccessContext";
-import { isStaff, isSuperAdmin } from "../features/access/domain";
+import { costAidReminderCard, isStaff, isSuperAdmin } from "../features/access/domain";
 import type { RootStackParamList } from "../features/access/types";
 
 export function BrandAvatar({ size = 46 }: { size?: number }) {
@@ -260,8 +260,10 @@ export function UserFooter({
 }
 
 export function NotificationCards() {
-  const { events } = useAccess();
-  if (!events.length) {
+  const { events, current } = useAccess();
+  const reminder = costAidReminderCard(current);
+
+  if (!events.length && !reminder) {
     return (
       <View style={[styles.card, { alignItems: "center", paddingVertical: 22 }]}>
         <Text style={styles.muted}>Nenhuma notificação no momento.</Text>
@@ -270,6 +272,35 @@ export function NotificationCards() {
   }
   return (
     <View style={{ gap: 10 }}>
+      {reminder && (
+        <View
+          key={reminder.id}
+          style={[
+            styles.card,
+            styles.row,
+            { padding: 16, borderColor: colors.primaryLight, alignItems: "flex-start" },
+          ]}
+        >
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              backgroundColor: colors.primarySoft,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <MaterialIcons name="account-balance-wallet" size={20} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={[styles.text, { fontWeight: "700", fontSize: 15, color: colors.ink }]}>
+              {reminder.title}
+            </Text>
+            <Text style={[styles.muted, { fontSize: 12 }]}>{reminder.body}</Text>
+          </View>
+        </View>
+      )}
       {events.map((event) => (
         <View
           key={event.id}

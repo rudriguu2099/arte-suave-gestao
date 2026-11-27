@@ -87,6 +87,7 @@ export type EditableFinanceEntry = {
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
+  Notifications: undefined;
   Accounts: undefined;
   Responsibles: undefined;
   AccountForm:
